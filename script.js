@@ -1,36 +1,30 @@
-// ...existing code...
-
-
-
 async function loadProducts() {
-  // tenta buscar do servidor, se falhar usa localStorage
-  try {
-    const res = await fetch('produtos/cantina');
-    if (!res.ok) throw new Error('Falha ao buscar produtos');
-    const rows = await res.json();
-    // normaliza campos do banco MySQL para o formato usado pelo frontend
-    return rows.map(p => ({
-      id: String(p.id),
-      name: p.nome || p.name,
-      desc: p.descricao || p.desc || '',
-      price: Number(p.preco ?? p.price ?? 0),
-      category: p.categoria || p.category || 'Geral',
-      image: p.image || p.imagem || '',
-      isMarmita: !!p.isMarmita,
-      marmitaConfig: p.marmitaConfig ? (typeof p.marmitaConfig === 'string' ? JSON.parse(p.marmitaConfig) : p.marmitaConfig) : null
-    }));
-  } catch (e) {
-    try {
-      return JSON.parse(localStorage.getItem('produtos') || '[]');
-    } catch (_) {
-      return [];
-    }
+  const res = await fetch('api/produtos.php', { headers: { Accept: 'application/json' } });
+  if (!res.ok) {
+    throw new Error('Falha ao buscar produtos');
   }
+
+  const payload = await res.json();
+  if (!payload.ok || !Array.isArray(payload.data)) {
+    throw new Error(payload.message || 'Resposta invalida da API de produtos');
+  }
+
+  return payload.data.map((p) => ({
+    id: String(p.id),
+    name: p.name || '',
+    desc: p.desc || '',
+    price: Number(p.price || 0),
+    category: p.category || 'geral',
+    image: p.image || '',
+    isMarmita: !!p.isMarmita,
+    marmitaConfig: p.marmitaConfig || null,
+  }));
 }
 
 function saveCart(cart) {
   localStorage.setItem('carrinho', JSON.stringify(cart));
 }
+
 function loadCart() {
   try {
     return JSON.parse(localStorage.getItem('carrinho') || '[]');
@@ -53,22 +47,31 @@ let produtos = [];
 let carrinho = [];
 
 async function renderProdutos() {
-  produtos = await loadProducts();
   if (!produtosEl) return;
+
+  try {
+    produtos = await loadProducts();
+  } catch (err) {
+    console.error(err);
+    produtos = [];
+  }
+
   produtosEl.innerHTML = '';
 
   const categorias = {};
-  produtos.forEach(p => {
-    if (!categorias[p.category]) categorias[p.category] = [];
-    categorias[p.category].push(p);
+  produtos.forEach((p) => {
+    const categoria = p.category || 'geral';
+    if (!categorias[categoria]) categorias[categoria] = [];
+    categorias[categoria].push(p);
   });
 
-  Object.keys(categorias).forEach(cat => {
+  Object.keys(categorias).forEach((cat) => {
     const section = document.createElement('section');
     section.innerHTML = `<div class="section-title">${cat.charAt(0).toUpperCase() + cat.slice(1)}</div>
       <div class="cards"></div>`;
+
     const cards = section.querySelector('.cards');
-    categorias[cat].forEach(prod => {
+    categorias[cat].forEach((prod) => {
       const card = document.createElement('div');
       card.className = 'card-item';
       card.innerHTML = `
@@ -78,7 +81,11 @@ async function renderProdutos() {
         <div class="body">
           <h4>${escapeHtml(prod.name)}</h4>
           <p>${escapeHtml(prod.desc || '')}</p>
-          <div class="price">${prod.isMarmita ? 'A partir de R$ ' + Number(prod.marmitaConfig?.precoP || 0).toFixed(2) : 'R$ ' + Number(prod.price || 0).toFixed(2)}</div>
+          <div class="price">${
+            prod.isMarmita
+              ? 'A partir de R$ ' + Number(prod.marmitaConfig?.precoP || 0).toFixed(2)
+              : 'R$ ' + Number(prod.price || 0).toFixed(2)
+          }</div>
           <div class="buy">
             <button class="btn primary" data-id="${prod.id}" data-marmita="${!!prod.isMarmita}">
               ${prod.isMarmita ? 'Montar Marmita' : 'Adicionar'}
@@ -88,22 +95,28 @@ async function renderProdutos() {
       `;
       cards.appendChild(card);
     });
+
     produtosEl.appendChild(section);
   });
 }
 
-produtosEl && produtosEl.addEventListener('click', (e) => {
-  const btn = e.target.closest('button[data-id]');
-  if (!btn) return;
-  const id = btn.getAttribute('data-id');
-  const produto = produtos.find(p => String(p.id) === String(id));
-  if (!produto) return;
-  if (produto.isMarmita) {
-    window.location.href = `marmita.html?id=${produto.id}`;
-  } else {
+if (produtosEl) {
+  produtosEl.addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-id]');
+    if (!btn) return;
+
+    const id = btn.getAttribute('data-id');
+    const produto = produtos.find((p) => String(p.id) === String(id));
+    if (!produto) return;
+
+    if (produto.isMarmita) {
+      window.location.href = `marmita.html?id=${produto.id}`;
+      return;
+    }
+
     addToCart({ ...produto, quantidade: 1 });
-  }
-});
+  });
+}
 
 function renderCarrinho() {
   carrinho = loadCart();
@@ -111,17 +124,19 @@ function renderCarrinho() {
 
   itensCarrinhoEl.innerHTML = '';
   let total = 0;
+
   carrinho.forEach((item, idx) => {
-    const valor = item.isMarmita ? (item.valor ?? item.price ?? 0) : (item.price ?? 0);
+    const valor = item.isMarmita ? Number(item.valor ?? item.price ?? 0) : Number(item.price ?? 0);
     const desc = item.isMarmita
       ? `<div style="font-size:12px;color:#666">
           <b>Tam:</b> ${escapeHtml(item.tamanho || '-') }<br>
           <b>Carbo:</b> ${escapeHtml(item.carbo || '-') }<br>
-          <b>Proteínas:</b> ${(item.proteinas || []).map(escapeHtml).join(', ') || '-'}<br>
+          <b>Proteinas:</b> ${(item.proteinas || []).map(escapeHtml).join(', ') || '-'}<br>
           <b>Saladas:</b> ${(item.saladas || []).map(escapeHtml).join(', ') || '-'}<br>
           <b>Adicionais:</b> ${(item.adicionais || []).map(escapeHtml).join(', ') || '-'}
         </div>`
       : '';
+
     const itemHtml = document.createElement('div');
     itemHtml.className = 'cart-item';
     itemHtml.innerHTML = `
@@ -132,73 +147,111 @@ function renderCarrinho() {
         <div style="font-size:13px;color:#888">Qtd: ${item.quantidade}</div>
       </div>
       <div style="font-weight:700">R$ ${(valor * item.quantidade).toFixed(2)}</div>
-      <button class="btn small" data-remove="${idx}" style="margin-left:5px;">✕</button>
+      <button class="btn small" data-remove="${idx}" style="margin-left:5px;">X</button>
     `;
+
     itensCarrinhoEl.appendChild(itemHtml);
     total += valor * item.quantidade;
   });
 
   totalEl.textContent = total.toFixed(2);
-  contadorEl && (contadorEl.textContent = carrinho.reduce((s, i) => s + i.quantidade, 0));
+  contadorEl.textContent = String(carrinho.reduce((s, i) => s + i.quantidade, 0));
 }
 
-itensCarrinhoEl && itensCarrinhoEl.addEventListener('click', (e) => {
-  const btn = e.target.closest('[data-remove]');
-  if (!btn) return;
-  const idx = Number(btn.getAttribute('data-remove'));
-  if (Number.isInteger(idx)) {
+if (itensCarrinhoEl) {
+  itensCarrinhoEl.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-remove]');
+    if (!btn) return;
+
+    const idx = Number(btn.getAttribute('data-remove'));
+    if (!Number.isInteger(idx)) return;
+
     carrinho.splice(idx, 1);
     saveCart(carrinho);
     renderCarrinho();
-  }
-});
+  });
+}
 
 if (limparCarrinhoBtn) {
   limparCarrinhoBtn.onclick = () => {
-    if (confirm('Limpar carrinho?')) {
-      carrinho = [];
-      saveCart(carrinho);
-      renderCarrinho();
-    }
+    if (!confirm('Limpar carrinho?')) return;
+    carrinho = [];
+    saveCart(carrinho);
+    renderCarrinho();
   };
 }
 
 if (finalizarBtn) {
   finalizarBtn.onclick = async () => {
     carrinho = loadCart();
-    if (carrinho.length === 0) return alert('Carrinho vazio!');
-    // monta payload simples para /api/pedidos
-    const itensApi = carrinho.map(it => ({
+    if (carrinho.length === 0) {
+      alert('Carrinho vazio!');
+      return;
+    }
+
+    const itensApi = carrinho.map((it) => ({
       id_produto: Number(it.id),
-      quantidade: it.quantidade,
-      preco_unitario: Number(it.price ?? it.valor ?? 0)
+      nome_produto: String(it.name || ''),
+      quantidade: Number(it.quantidade || 1),
+      preco_unitario: Number(it.isMarmita ? (it.valor ?? it.price ?? 0) : (it.price ?? 0)),
+      configuracao: it.isMarmita
+        ? {
+            tamanho: it.tamanho || null,
+            carbo: it.carbo || null,
+            proteinas: Array.isArray(it.proteinas) ? it.proteinas : [],
+            saladas: Array.isArray(it.saladas) ? it.saladas : [],
+            adicionais: Array.isArray(it.adicionais) ? it.adicionais : [],
+          }
+        : null,
     }));
-    const valor_total = itensApi.reduce((s, it) => s + it.quantidade * it.preco_unitario, 0);
+
     try {
-      const res = await fetch('/api/pedidos', {
+      const res = await fetch('api/pedidos.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id_usuario: null, itens: itensApi, valor_total })
+        body: JSON.stringify({ itens: itensApi }),
       });
-      if (!res.ok) throw new Error('Falha ao enviar pedido');
+
+      let payload = {};
+      try {
+        payload = await res.json();
+      } catch (_err) {
+        payload = {};
+      }
+
+      if (!res.ok || !payload.ok) {
+        if (res.status === 401) {
+          alert('Faca login para finalizar seu pedido.');
+          window.location.href = 'login.php';
+          return;
+        }
+        throw new Error(payload.message || 'Erro ao finalizar pedido.');
+      }
+
       alert('Pedido finalizado com sucesso!');
       carrinho = [];
       saveCart(carrinho);
       renderCarrinho();
     } catch (err) {
       console.error(err);
-      alert('Erro ao finalizar pedido. Tente novamente.');
+      alert(err.message || 'Erro ao finalizar pedido.');
     }
   };
 }
 
-abrirCarrinhoBtn && (abrirCarrinhoBtn.onclick = () => carrinhoEl && carrinhoEl.classList.add('open'));
-fecharCarrinhoBtn && (fecharCarrinhoBtn.onclick = () => carrinhoEl && carrinhoEl.classList.remove('open'));
+if (abrirCarrinhoBtn) {
+  abrirCarrinhoBtn.onclick = () => carrinhoEl && carrinhoEl.classList.add('open');
+}
+
+if (fecharCarrinhoBtn) {
+  fecharCarrinhoBtn.onclick = () => carrinhoEl && carrinhoEl.classList.remove('open');
+}
 
 function addToCart(produto) {
   carrinho = loadCart();
+
   if (produto.isMarmita) {
-    const idx = carrinho.findIndex(item =>
+    const idx = carrinho.findIndex((item) =>
       item.isMarmita &&
       item.id === produto.id &&
       item.tamanho === produto.tamanho &&
@@ -207,19 +260,21 @@ function addToCart(produto) {
       JSON.stringify(item.saladas || []) === JSON.stringify(produto.saladas || []) &&
       JSON.stringify(item.adicionais || []) === JSON.stringify(produto.adicionais || [])
     );
+
     if (idx >= 0) {
       carrinho[idx].quantidade += produto.quantidade;
     } else {
       carrinho.push({ ...produto });
     }
   } else {
-    const idx = carrinho.findIndex(item => !item.isMarmita && item.id === produto.id);
+    const idx = carrinho.findIndex((item) => !item.isMarmita && item.id === produto.id);
     if (idx >= 0) {
       carrinho[idx].quantidade += produto.quantidade;
     } else {
       carrinho.push({ ...produto });
     }
   }
+
   saveCart(carrinho);
   renderCarrinho();
 }
@@ -227,12 +282,12 @@ function addToCart(produto) {
 window.addEventListener('produtosAtualizados', async () => {
   await renderProdutos();
 });
+
 window.addEventListener('DOMContentLoaded', async () => {
   await renderProdutos();
   renderCarrinho();
 });
 
-// simples escape para inserir texto no HTML
 function escapeHtml(s) {
   if (s == null) return '';
   return String(s)

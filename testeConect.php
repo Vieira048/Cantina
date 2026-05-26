@@ -1,27 +1,12 @@
 <?php
-session_start();
+declare(strict_types=1);
 
-    if(isset($_POST['submit']) && !empty($_POST['email']) && !empty($_POST['senha']));
-    {  
-    include_once('config.php');
-    $email = $_POST['email'];
-    $senha = $_POST['senha'];
+require_once __DIR__ . '/config.php';
 
-    if(mysql_num_rows($result) < 1)
-    {
-        unset($_SESSION['email'] = $email;)
-        unset($_SESSION['senha'] = $senha;)
-        unset(header{'Location: login.php'};)
-    }
-    else
-    {
-        $_SESSION['email'] = $email;
-        $_SESSION['senha'] = $senha;
-        header('Location: inder.php')
-    }
+try {
+    $con = obterConexao();
+    echo 'Conexao com MySQL OK.';
+} catch (Throwable $e) {
+    http_response_code(500);
+    echo 'Falha na conexao: ' . $e->getMessage();
 }
-else
-{
-    header('Location: login.php')
-}
-?>

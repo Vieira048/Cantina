@@ -1,15 +1,9 @@
 <?php
+declare(strict_types=1);
 
-    session_start();
+require_once __DIR__ . '/app/bootstrap.php';
 
-    // Remove todas as variáveis de sessão
-    session_unset();
+use App\Controllers\AuthController;
 
-    // Destrói a sessão
-    session_destroy();
-
-    //unset($logado);
-
-    header("Location: login.php");
-
-?>
+$controller = new AuthController();
+$controller->logout();

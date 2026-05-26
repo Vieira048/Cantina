@@ -1,120 +1,172 @@
-function loadProducts() {
-  try { return JSON.parse(localStorage.getItem('produtos') || '[]'); } catch (e) { return []; }
-}
 function saveCart(cart) {
   localStorage.setItem('carrinho', JSON.stringify(cart));
 }
+
 function loadCart() {
-  try { return JSON.parse(localStorage.getItem('carrinho') || '[]'); } catch (e) { return []; }
+  try {
+    return JSON.parse(localStorage.getItem('carrinho') || '[]');
+  } catch (e) {
+    return [];
+  }
+}
+
+async function loadMarmita(id) {
+  const res = await fetch(`api/produtos.php?id=${encodeURIComponent(id)}`, {
+    headers: { Accept: 'application/json' },
+  });
+
+  if (!res.ok) {
+    throw new Error('Falha ao buscar dados da marmita');
+  }
+
+  const payload = await res.json();
+  if (!payload.ok || !payload.data) {
+    throw new Error(payload.message || 'Marmita nao encontrada');
+  }
+
+  if (!payload.data.isMarmita) {
+    throw new Error('Produto informado nao e marmita');
+  }
+
+  return payload.data;
 }
 
 const urlParams = new URLSearchParams(window.location.search);
 const marmitaId = urlParams.get('id');
-const produtos = loadProducts();
-const marmita = produtos.find(p => p.id === marmitaId && p.isMarmita);
 
 const marmitaTamanho = document.getElementById('marmitaTamanho');
 const marmitaOpcoes = document.getElementById('marmitaOpcoes');
 const marmitaValor = document.getElementById('marmitaValor');
 const formMarmita = document.getElementById('formMarmita');
 
-if (!marmita) {
-  document.body.innerHTML = '<h2>Marmita não encontrada!</h2>';
-  throw new Error('Marmita não encontrada');
-}
+let marmita = null;
 
 function renderTamanhos() {
   const cfg = marmita.marmitaConfig || {};
   marmitaTamanho.innerHTML = `
     <option value="P">Pequena - R$ ${Number(cfg.precoP || 0).toFixed(2)}</option>
-    <option value="M">Média - R$ ${Number(cfg.precoM || 0).toFixed(2)}</option>
+    <option value="M">Media - R$ ${Number(cfg.precoM || 0).toFixed(2)}</option>
     <option value="G">Grande - R$ ${Number(cfg.precoG || 0).toFixed(2)}</option>
   `;
 }
+
 function renderOpcoes() {
   const cfg = marmita.marmitaConfig || {};
   let html = '';
-  
+
   html += `<div class="field"><label>Carboidrato</label>`;
   (cfg.carbos || []).forEach((c, i) => {
     html += `<label style="margin-right:10px;">
-      <input type="radio" name="carbo" value="${c}" ${i === 0 ? 'checked' : ''}> ${c}
+      <input type="radio" name="carbo" value="${escapeHtml(c)}" ${i === 0 ? 'checked' : ''}> ${escapeHtml(c)}
     </label>`;
   });
   html += `</div>`;
-  
-  html += `<div class="field"><label>Proteínas</label>`;
+
+  html += `<div class="field"><label>Proteinas</label>`;
   (cfg.proteinas || []).forEach((p) => {
     html += `<label style="margin-right:10px;">
-      <input type="checkbox" name="proteina" value="${p}"> ${p}
+      <input type="checkbox" name="proteina" value="${escapeHtml(p)}"> ${escapeHtml(p)}
     </label>`;
   });
   html += `</div>`;
-  
+
   html += `<div class="field"><label>Saladas</label>`;
   (cfg.saladas || []).forEach((s) => {
     html += `<label style="margin-right:10px;">
-      <input type="checkbox" name="salada" value="${s}"> ${s}
+      <input type="checkbox" name="salada" value="${escapeHtml(s)}"> ${escapeHtml(s)}
     </label>`;
   });
   html += `</div>`;
-  
+
   html += `<div class="field"><label>Adicionais</label>`;
   (cfg.adicionais || []).forEach((a) => {
     html += `<label style="margin-right:10px;">
-      <input type="checkbox" name="adicional" value="${a}"> ${a}
+      <input type="checkbox" name="adicional" value="${escapeHtml(a)}"> ${escapeHtml(a)}
     </label>`;
   });
   html += `</div>`;
+
   marmitaOpcoes.innerHTML = html;
 }
-function atualizarValor() {
-  const tamanho = marmitaTamanho.value;
+
+function calcularValor(tamanho) {
   const cfg = marmita.marmitaConfig || {};
-  let valor = 0;
-  if (tamanho === 'P') valor = Number(cfg.precoP || 0);
-  if (tamanho === 'M') valor = Number(cfg.precoM || 0);
-  if (tamanho === 'G') valor = Number(cfg.precoG || 0);
+  if (tamanho === 'M') return Number(cfg.precoM || 0);
+  if (tamanho === 'G') return Number(cfg.precoG || 0);
+  return Number(cfg.precoP || 0);
+}
+
+function atualizarValor() {
+  const valor = calcularValor(marmitaTamanho.value);
   marmitaValor.textContent = `Valor: R$ ${valor.toFixed(2)}`;
 }
 
-marmitaTamanho.addEventListener('change', atualizarValor);
+if (marmitaTamanho) {
+  marmitaTamanho.addEventListener('change', atualizarValor);
+}
 
-formMarmita.onsubmit = (e) => {
-  e.preventDefault();
-  const tamanho = marmitaTamanho.value;
-  const cfg = marmita.marmitaConfig || {};
-  let valor = 0;
-  if (tamanho === 'P') valor = Number(cfg.precoP || 0);
-  if (tamanho === 'M') valor = Number(cfg.precoM || 0);
-  if (tamanho === 'G') valor = Number(cfg.precoG || 0);
+if (formMarmita) {
+  formMarmita.onsubmit = (e) => {
+    e.preventDefault();
 
-  const carbo = formMarmita.querySelector('input[name="carbo"]:checked')?.value || '';
-  const proteinas = Array.from(formMarmita.querySelectorAll('input[name="proteina"]:checked')).map(i => i.value);
-  const saladas = Array.from(formMarmita.querySelectorAll('input[name="salada"]:checked')).map(i => i.value);
-  const adicionais = Array.from(formMarmita.querySelectorAll('input[name="adicional"]:checked')).map(i => i.value);
+    const tamanho = marmitaTamanho.value;
+    const valor = calcularValor(tamanho);
 
-  if (!carbo) return alert('Escolha um carboidrato!');
+    const carbo = formMarmita.querySelector('input[name="carbo"]:checked')?.value || '';
+    const proteinas = Array.from(formMarmita.querySelectorAll('input[name="proteina"]:checked')).map((i) => i.value);
+    const saladas = Array.from(formMarmita.querySelectorAll('input[name="salada"]:checked')).map((i) => i.value);
+    const adicionais = Array.from(formMarmita.querySelectorAll('input[name="adicional"]:checked')).map((i) => i.value);
 
-  
-  const carrinho = loadCart();
-  carrinho.push({
-    id: marmita.id,
-    name: marmita.name,
-    image: marmita.image,
-    isMarmita: true,
-    tamanho,
-    valor,
-    carbo,
-    proteinas,
-    saladas,
-    adicionais,
-    quantidade: 1
-  });
-  saveCart(carrinho);
-  window.location.href = "index.html";
-};
+    if (!carbo) {
+      alert('Escolha um carboidrato!');
+      return;
+    }
 
-renderTamanhos();
-renderOpcoes();
-atualizarValor();
+    const carrinho = loadCart();
+    carrinho.push({
+      id: marmita.id,
+      name: marmita.name,
+      image: marmita.image,
+      isMarmita: true,
+      tamanho,
+      valor,
+      carbo,
+      proteinas,
+      saladas,
+      adicionais,
+      quantidade: 1,
+    });
+
+    saveCart(carrinho);
+    window.location.href = 'index.php';
+  };
+}
+
+async function init() {
+  if (!marmitaId) {
+    document.body.innerHTML = '<h2>Marmita nao encontrada.</h2>';
+    return;
+  }
+
+  try {
+    marmita = await loadMarmita(marmitaId);
+    renderTamanhos();
+    renderOpcoes();
+    atualizarValor();
+  } catch (err) {
+    document.body.innerHTML = '<h2>Marmita nao encontrada.</h2>';
+    console.error(err);
+  }
+}
+
+function escapeHtml(s) {
+  if (s == null) return '';
+  return String(s)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+window.addEventListener('DOMContentLoaded', init);

@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Core\Database;
+use DateTimeImmutable;
 use RuntimeException;
 use mysqli;
 use Throwable;
@@ -12,11 +13,14 @@ final class OrderModel
 {
     private mysqli $conn;
     private string $orderCreatedAtColumn;
+    /** @var string[] */
+    private array $orderStatusOptions;
 
     public function __construct()
     {
         $this->conn = Database::connection();
         $this->orderCreatedAtColumn = $this->detectCreatedAtColumn();
+        $this->orderStatusOptions = $this->detectStatusOptions();
     }
 
     public function listRecentWithUser(int $limit = 100): array
@@ -49,6 +53,131 @@ final class OrderModel
         }
 
         return $orders;
+    }
+
+    public function listOpenWithItems(int $limit = 50): array
+    {
+        $limit = max(1, $limit);
+        $openStatuses = $this->resolveOpenStatuses();
+        if ($openStatuses === []) {
+            return [];
+        }
+
+        $column = $this->orderCreatedAtColumn;
+        $statusList = $this->quoteStringList($openStatuses);
+
+        $sql = "SELECT p.id, p.usuario_id, p.valor_total, p.status, p.$column AS criado_em, u.nome AS usuario_nome, u.email AS usuario_email
+                FROM pedidos p
+                LEFT JOIN usuarios u ON u.id = p.usuario_id
+                WHERE p.status IN ($statusList)
+                ORDER BY p.id ASC
+                LIMIT ?";
+
+        $stmt = $this->conn->prepare($sql);
+        $stmt->bind_param('i', $limit);
+        $stmt->execute();
+
+        $result = $stmt->get_result();
+        $orders = [];
+        $orderIds = [];
+
+        while ($row = $result->fetch_assoc()) {
+            $orderId = (int) $row['id'];
+            $orderIds[] = $orderId;
+            $orders[] = [
+                'id' => $orderId,
+                'usuario_id' => $row['usuario_id'] !== null ? (int) $row['usuario_id'] : null,
+                'usuario_nome' => (string) ($row['usuario_nome'] ?? ''),
+                'usuario_email' => (string) ($row['usuario_email'] ?? ''),
+                'valor_total' => (float) $row['valor_total'],
+                'status' => (string) $row['status'],
+                'criado_em' => (string) $row['criado_em'],
+                'itens' => [],
+            ];
+        }
+
+        if ($orderIds === []) {
+            return [];
+        }
+
+        $itemsByOrder = $this->loadItemsByOrderIds($orderIds);
+        foreach ($orders as &$order) {
+            $order['itens'] = $itemsByOrder[$order['id']] ?? [];
+        }
+        unset($order);
+
+        return $orders;
+    }
+
+    public function markAsDelivered(int $orderId): bool
+    {
+        if ($orderId <= 0) {
+            return false;
+        }
+
+        $deliveredStatus = $this->resolveDeliveredStatus();
+        $stmt = $this->conn->prepare('UPDATE pedidos SET status = ? WHERE id = ?');
+        $stmt->bind_param('si', $deliveredStatus, $orderId);
+        $stmt->execute();
+
+        if ($stmt->affected_rows > 0) {
+            return true;
+        }
+
+        $check = $this->conn->prepare('SELECT id FROM pedidos WHERE id = ? AND status = ? LIMIT 1');
+        $check->bind_param('is', $orderId, $deliveredStatus);
+        $check->execute();
+        $result = $check->get_result();
+
+        return (bool) ($result && $result->fetch_assoc());
+    }
+
+    public function monthlySalesReport(?string $monthRef = null, int $limit = 10): array
+    {
+        $limit = max(1, $limit);
+
+        [$month, $startDate, $endDate] = $this->buildMonthRange($monthRef);
+        $deliveredStatuses = $this->resolveDeliveredStatusesForReport();
+        if ($deliveredStatuses === []) {
+            return [
+                'month' => $month,
+                'items' => [],
+            ];
+        }
+
+        $column = $this->orderCreatedAtColumn;
+        $statusList = $this->quoteStringList($deliveredStatuses);
+
+        $sql = "SELECT pi.nome_produto AS produto,
+                       SUM(pi.quantidade) AS quantidade_vendida,
+                       SUM(pi.quantidade * pi.preco_unitario) AS faturamento
+                FROM pedido_itens pi
+                INNER JOIN pedidos p ON p.id = pi.pedido_id
+                WHERE p.status IN ($statusList)
+                  AND p.$column >= ?
+                  AND p.$column < ?
+                GROUP BY pi.nome_produto
+                ORDER BY quantidade_vendida DESC, faturamento DESC
+                LIMIT ?";
+
+        $stmt = $this->conn->prepare($sql);
+        $stmt->bind_param('ssi', $startDate, $endDate, $limit);
+        $stmt->execute();
+
+        $result = $stmt->get_result();
+        $items = [];
+        while ($row = $result->fetch_assoc()) {
+            $items[] = [
+                'produto' => (string) ($row['produto'] ?? 'Sem nome'),
+                'quantidade_vendida' => (int) ($row['quantidade_vendida'] ?? 0),
+                'faturamento' => (float) ($row['faturamento'] ?? 0),
+            ];
+        }
+
+        return [
+            'month' => $month,
+            'items' => $items,
+        ];
     }
 
     public function createFromItems(int $usuarioId, array $items): array
@@ -125,6 +254,184 @@ final class OrderModel
             $this->conn->rollback();
             throw $e;
         }
+    }
+
+    private function loadItemsByOrderIds(array $orderIds): array
+    {
+        if ($orderIds === []) {
+            return [];
+        }
+
+        $cleanIds = array_values(array_unique(array_map(static fn ($id): int => (int) $id, $orderIds)));
+        if ($cleanIds === []) {
+            return [];
+        }
+
+        $idList = implode(',', $cleanIds);
+        $sql = "SELECT pedido_id, nome_produto, quantidade, preco_unitario, configuracao
+                FROM pedido_itens
+                WHERE pedido_id IN ($idList)
+                ORDER BY id ASC";
+
+        $result = $this->conn->query($sql);
+        $itemsByOrder = [];
+
+        while ($row = $result->fetch_assoc()) {
+            $orderId = (int) $row['pedido_id'];
+            if (!isset($itemsByOrder[$orderId])) {
+                $itemsByOrder[$orderId] = [];
+            }
+
+            $configuration = null;
+            $rawConfig = (string) ($row['configuracao'] ?? '');
+            if ($rawConfig !== '') {
+                $decoded = json_decode($rawConfig, true);
+                if (is_array($decoded)) {
+                    $configuration = $decoded;
+                }
+            }
+
+            $qty = (int) ($row['quantidade'] ?? 0);
+            $unit = (float) ($row['preco_unitario'] ?? 0);
+
+            $itemsByOrder[$orderId][] = [
+                'nome' => (string) ($row['nome_produto'] ?? 'Item'),
+                'quantidade' => $qty,
+                'preco_unitario' => $unit,
+                'subtotal' => $qty * $unit,
+                'configuracao' => $configuration,
+            ];
+        }
+
+        return $itemsByOrder;
+    }
+
+    private function buildMonthRange(?string $monthRef): array
+    {
+        $monthRef = trim((string) $monthRef);
+
+        $date = null;
+        if ($monthRef !== '' && preg_match('/^\d{4}-\d{2}$/', $monthRef) === 1) {
+            $date = DateTimeImmutable::createFromFormat('!Y-m', $monthRef) ?: null;
+        }
+
+        if (!$date) {
+            $date = new DateTimeImmutable('first day of this month 00:00:00');
+        }
+
+        $start = $date->format('Y-m-01 00:00:00');
+        $end = $date->modify('+1 month')->format('Y-m-01 00:00:00');
+
+        return [$date->format('Y-m'), $start, $end];
+    }
+
+    /**
+     * @return string[]
+     */
+    private function resolveOpenStatuses(): array
+    {
+        $delivered = $this->resolveDeliveredStatus();
+        $blacklist = [$delivered, 'cancelado'];
+
+        $open = [];
+        foreach ($this->orderStatusOptions as $status) {
+            if (!in_array($status, $blacklist, true)) {
+                $open[] = $status;
+            }
+        }
+
+        return $open;
+    }
+
+    /**
+     * @return string[]
+     */
+    private function resolveDeliveredStatusesForReport(): array
+    {
+        $candidates = ['finalizado', 'pronto', 'entregue'];
+        $values = [];
+
+        foreach ($candidates as $candidate) {
+            if (in_array($candidate, $this->orderStatusOptions, true)) {
+                $values[] = $candidate;
+            }
+        }
+
+        if ($values === []) {
+            $values[] = $this->resolveDeliveredStatus();
+        }
+
+        return array_values(array_unique($values));
+    }
+
+    private function resolveDeliveredStatus(): string
+    {
+        foreach (['finalizado', 'pronto', 'entregue'] as $candidate) {
+            if (in_array($candidate, $this->orderStatusOptions, true)) {
+                return $candidate;
+            }
+        }
+
+        if ($this->orderStatusOptions !== []) {
+            return $this->orderStatusOptions[count($this->orderStatusOptions) - 1];
+        }
+
+        return 'finalizado';
+    }
+
+    private function quoteStringList(array $values): string
+    {
+        if ($values === []) {
+            return "''";
+        }
+
+        $parts = [];
+        foreach ($values as $value) {
+            $parts[] = "'" . $this->conn->real_escape_string((string) $value) . "'";
+        }
+
+        return implode(', ', $parts);
+    }
+
+    /**
+     * @return string[]
+     */
+    private function detectStatusOptions(): array
+    {
+        $result = $this->conn->query("SHOW COLUMNS FROM pedidos LIKE 'status'");
+        if (!$result) {
+            return ['pendente', 'preparando', 'finalizado', 'cancelado'];
+        }
+
+        $row = $result->fetch_assoc();
+        if (!$row) {
+            return ['pendente', 'preparando', 'finalizado', 'cancelado'];
+        }
+
+        $type = (string) ($row['Type'] ?? $row['type'] ?? '');
+        if ($type === '') {
+            return ['pendente', 'preparando', 'finalizado', 'cancelado'];
+        }
+
+        if (preg_match('/^enum\((.*)\)$/i', $type, $matches) !== 1) {
+            return ['pendente', 'preparando', 'finalizado', 'cancelado'];
+        }
+
+        $inner = $matches[1];
+        $values = str_getcsv($inner, ',', "'", '\\');
+        $clean = [];
+        foreach ($values as $value) {
+            $v = trim((string) $value);
+            if ($v !== '') {
+                $clean[] = $v;
+            }
+        }
+
+        if ($clean === []) {
+            return ['pendente', 'preparando', 'finalizado', 'cancelado'];
+        }
+
+        return $clean;
     }
 
     private function detectCreatedAtColumn(): string

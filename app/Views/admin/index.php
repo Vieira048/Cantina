@@ -225,6 +225,7 @@ input:focus, select:focus, textarea:focus {
   <header class="topbar">
     <div class="logo">Cantina - ADM</div>
     <nav>
+      <a href="pedidos.php" class="btn">Pedidos</a>
       <a href="index.php" class="btn">Voltar ao Site</a>
       <a href="deslogar.php" class="btn">Deslogar</a>
     </nav>

@@ -28,37 +28,82 @@ final class OrderApiController
 
         try {
             if ($method === 'GET') {
-                $this->assertAdmin();
-                JsonResponse::send(200, ['ok' => true, 'data' => $this->orders->listRecentWithUser(100)]);
+                $this->handleGet();
             }
 
-            $this->assertLoggedIn();
-            $data = $this->readJsonBody();
-            $items = $data['itens'] ?? [];
-
-            if (!is_array($items) || count($items) === 0) {
-                JsonResponse::send(422, ['ok' => false, 'message' => 'Pedido sem itens.']);
+            $action = strtolower(trim((string) ($_GET['action'] ?? '')));
+            if (in_array($action, ['deliver', 'entregar', 'entregue'], true)) {
+                $this->handleDeliver();
             }
 
-            $userId = SessionAuth::userId();
-            if ($userId === null) {
-                JsonResponse::send(401, ['ok' => false, 'message' => 'Sessao invalida.']);
-            }
-
-            try {
-                $result = $this->orders->createFromItems($userId, $items);
-            } catch (RuntimeException $e) {
-                JsonResponse::send(422, ['ok' => false, 'message' => $e->getMessage()]);
-            }
-
-            JsonResponse::send(201, [
-                'ok' => true,
-                'message' => 'Pedido registrado com sucesso.',
-                'data' => $result,
-            ]);
+            $this->handleCreateOrder();
         } catch (Throwable $e) {
             JsonResponse::send(500, ['ok' => false, 'message' => 'Erro interno ao processar pedido.']);
         }
+    }
+
+    private function handleGet(): void
+    {
+        $this->assertAdmin();
+
+        $action = strtolower(trim((string) ($_GET['action'] ?? '')));
+        if ($action === 'dashboard') {
+            $month = trim((string) ($_GET['month'] ?? ''));
+            JsonResponse::send(200, [
+                'ok' => true,
+                'data' => [
+                    'pedidos' => $this->orders->listOpenWithItems(100),
+                    'relatorio' => $this->orders->monthlySalesReport($month !== '' ? $month : null, 12),
+                ],
+            ]);
+        }
+
+        JsonResponse::send(200, ['ok' => true, 'data' => $this->orders->listRecentWithUser(100)]);
+    }
+
+    private function handleDeliver(): void
+    {
+        $this->assertAdmin();
+        $data = $this->readJsonBody();
+        $orderId = (int) ($data['pedido_id'] ?? $data['id_pedido'] ?? 0);
+
+        if ($orderId <= 0) {
+            JsonResponse::send(422, ['ok' => false, 'message' => 'Pedido invalido.']);
+        }
+
+        if (!$this->orders->markAsDelivered($orderId)) {
+            JsonResponse::send(404, ['ok' => false, 'message' => 'Pedido nao encontrado.']);
+        }
+
+        JsonResponse::send(200, ['ok' => true, 'message' => 'Pedido marcado como entregue.']);
+    }
+
+    private function handleCreateOrder(): void
+    {
+        $this->assertLoggedIn();
+        $data = $this->readJsonBody();
+        $items = $data['itens'] ?? [];
+
+        if (!is_array($items) || count($items) === 0) {
+            JsonResponse::send(422, ['ok' => false, 'message' => 'Pedido sem itens.']);
+        }
+
+        $userId = SessionAuth::userId();
+        if ($userId === null) {
+            JsonResponse::send(401, ['ok' => false, 'message' => 'Sessao invalida.']);
+        }
+
+        try {
+            $result = $this->orders->createFromItems($userId, $items);
+        } catch (RuntimeException $e) {
+            JsonResponse::send(422, ['ok' => false, 'message' => $e->getMessage()]);
+        }
+
+        JsonResponse::send(201, [
+            'ok' => true,
+            'message' => 'Pedido registrado com sucesso.',
+            'data' => $result,
+        ]);
     }
 
     private function readJsonBody(): array

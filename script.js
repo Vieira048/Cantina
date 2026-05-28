@@ -25,9 +25,41 @@ function saveCart(cart) {
   localStorage.setItem('carrinho', JSON.stringify(cart));
 }
 
+function normalizeQty(item) {
+  const raw = item?.quantidade ?? item?.qtd ?? item?.qty ?? item?.quantity ?? 1;
+  const qty = Number(raw);
+  if (!Number.isFinite(qty) || qty <= 0) {
+    return 1;
+  }
+  return Math.max(1, Math.round(qty));
+}
+
+function normalizeCartItem(item) {
+  if (!item || typeof item !== 'object') {
+    return null;
+  }
+
+  const normalized = {
+    ...item,
+    quantidade: normalizeQty(item),
+  };
+
+  if (!normalized.name && normalized.nome) {
+    normalized.name = String(normalized.nome);
+  }
+
+  return normalized;
+}
+
 function loadCart() {
   try {
-    return JSON.parse(localStorage.getItem('carrinho') || '[]');
+    const raw = JSON.parse(localStorage.getItem('carrinho') || '[]');
+    if (!Array.isArray(raw)) {
+      return [];
+    }
+    return raw
+      .map(normalizeCartItem)
+      .filter((item) => item && item.quantidade > 0);
   } catch (e) {
     return [];
   }
@@ -42,9 +74,174 @@ const abrirCarrinhoBtn = document.getElementById('abrirCarrinho');
 const fecharCarrinhoBtn = document.getElementById('fecharCarrinho');
 const limparCarrinhoBtn = document.getElementById('limparCarrinho');
 const finalizarBtn = document.getElementById('finalizar');
+const menuCategoriasToggleEl = document.getElementById('menuCategoriasToggle');
+const menuCategoriasEl = document.getElementById('menuCategorias');
+const menuCategoriasListaEl = document.getElementById('menuCategoriasLista');
+const menuUsuarioToggleEl = document.getElementById('menuUsuarioToggle');
+const menuUsuarioEl = document.getElementById('menuUsuario');
+const menuOverlayEl = document.getElementById('menuOverlay');
 
 let produtos = [];
 let carrinho = [];
+
+function normalizeText(value) {
+  return String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
+function categoryBaseId(categoryName) {
+  const base = normalizeText(categoryName)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+  if (base.includes('salgad')) return 'salgados';
+  if (base.includes('marmit')) return 'marmitas';
+  if (base.includes('bebid')) return 'bebidas';
+  return base || 'categoria';
+}
+
+function buildUniqueCategoryId(baseId, usedIds) {
+  let id = baseId;
+  let suffix = 2;
+  while (usedIds.has(id)) {
+    id = `${baseId}-${suffix}`;
+    suffix += 1;
+  }
+  usedIds.add(id);
+  return id;
+}
+
+function buildCategoryMenuEntries(categoryEntries) {
+  const preferredOrder = ['salgados', 'marmitas', 'bebidas'];
+  const ordered = [];
+  const used = new Set();
+
+  preferredOrder.forEach((key) => {
+    const found = categoryEntries.find((entry) => entry.baseId === key && !used.has(entry.id));
+    if (found) {
+      ordered.push(found);
+      used.add(found.id);
+    }
+  });
+
+  categoryEntries.forEach((entry) => {
+    if (!used.has(entry.id)) {
+      ordered.push(entry);
+      used.add(entry.id);
+    }
+  });
+
+  return ordered;
+}
+
+function renderCategoryMenu(categoryEntries) {
+  if (!menuCategoriasListaEl) return;
+
+  const entries = buildCategoryMenuEntries(categoryEntries);
+  if (entries.length === 0) {
+    return;
+  }
+
+  menuCategoriasListaEl.innerHTML = entries.map((entry) => `
+    <a href="#${entry.id}" class="menu-item menu-item-link" data-menu-target="${entry.id}">
+      ${escapeHtml(entry.label)}
+    </a>
+  `).join('');
+}
+
+function setOverlayVisible(visible) {
+  if (!menuOverlayEl) return;
+  menuOverlayEl.hidden = !visible;
+}
+
+function isCategoriasMenuOpen() {
+  return !!menuCategoriasEl && menuCategoriasEl.classList.contains('open');
+}
+
+function isUsuarioMenuOpen() {
+  return !!menuUsuarioEl && menuUsuarioEl.classList.contains('open');
+}
+
+function syncOverlayState() {
+  setOverlayVisible(isCategoriasMenuOpen() || isUsuarioMenuOpen());
+}
+
+function closeCategoriasMenu() {
+  if (!menuCategoriasEl || !menuCategoriasToggleEl) return;
+  menuCategoriasEl.classList.remove('open');
+  menuCategoriasEl.hidden = true;
+  menuCategoriasEl.setAttribute('aria-hidden', 'true');
+  menuCategoriasToggleEl.classList.remove('is-open');
+  menuCategoriasToggleEl.setAttribute('aria-expanded', 'false');
+  menuCategoriasToggleEl.setAttribute('aria-label', 'Abrir menu de categorias');
+  syncOverlayState();
+}
+
+function closeUsuarioMenu() {
+  if (!menuUsuarioEl || !menuUsuarioToggleEl) return;
+  menuUsuarioEl.classList.remove('open');
+  menuUsuarioEl.hidden = true;
+  menuUsuarioEl.setAttribute('aria-hidden', 'true');
+  menuUsuarioToggleEl.setAttribute('aria-expanded', 'false');
+  menuUsuarioToggleEl.setAttribute('aria-label', 'Abrir menu do usuario');
+  syncOverlayState();
+}
+
+function toggleCategoriasMenu() {
+  if (!menuCategoriasEl || !menuCategoriasToggleEl) return;
+  const shouldOpen = !isCategoriasMenuOpen();
+
+  if (shouldOpen) {
+    closeUsuarioMenu();
+    menuCategoriasEl.hidden = false;
+    menuCategoriasEl.classList.add('open');
+    menuCategoriasEl.setAttribute('aria-hidden', 'false');
+    menuCategoriasToggleEl.classList.add('is-open');
+    menuCategoriasToggleEl.setAttribute('aria-expanded', 'true');
+    menuCategoriasToggleEl.setAttribute('aria-label', 'Fechar menu de categorias');
+  } else {
+    closeCategoriasMenu();
+  }
+  syncOverlayState();
+}
+
+function toggleUsuarioMenu() {
+  if (!menuUsuarioEl || !menuUsuarioToggleEl) return;
+  const shouldOpen = !isUsuarioMenuOpen();
+
+  if (shouldOpen) {
+    closeCategoriasMenu();
+    menuUsuarioEl.hidden = false;
+    menuUsuarioEl.classList.add('open');
+    menuUsuarioEl.setAttribute('aria-hidden', 'false');
+    menuUsuarioToggleEl.setAttribute('aria-expanded', 'true');
+    menuUsuarioToggleEl.setAttribute('aria-label', 'Fechar menu do usuario');
+  } else {
+    closeUsuarioMenu();
+  }
+  syncOverlayState();
+}
+
+function closeAllFloatingMenus() {
+  closeCategoriasMenu();
+  closeUsuarioMenu();
+}
+
+function scrollToCategorySection(targetId) {
+  const section = document.getElementById(targetId);
+  if (!section) return;
+
+  const topbar = document.querySelector('.topbar');
+  const offset = topbar ? topbar.offsetHeight + 12 : 88;
+  const targetTop = section.getBoundingClientRect().top + window.scrollY - offset;
+
+  window.scrollTo({
+    top: Math.max(0, targetTop),
+    behavior: 'smooth',
+  });
+}
 
 async function renderProdutos() {
   if (!produtosEl) return;
@@ -65,8 +262,17 @@ async function renderProdutos() {
     categorias[categoria].push(p);
   });
 
+  const usedSectionIds = new Set();
+  const categoryEntries = [];
+
   Object.keys(categorias).forEach((cat) => {
+    const baseId = categoryBaseId(cat);
+    const sectionId = buildUniqueCategoryId(baseId, usedSectionIds);
+    categoryEntries.push({ label: cat, id: sectionId, baseId });
+
     const section = document.createElement('section');
+    section.id = sectionId;
+    section.className = 'catalog-section';
     section.innerHTML = `<div class="section-title">${cat.charAt(0).toUpperCase() + cat.slice(1)}</div>
       <div class="cards"></div>`;
 
@@ -98,6 +304,8 @@ async function renderProdutos() {
 
     produtosEl.appendChild(section);
   });
+
+  renderCategoryMenu(categoryEntries);
 }
 
 if (produtosEl) {
@@ -126,6 +334,7 @@ function renderCarrinho() {
   let total = 0;
 
   carrinho.forEach((item, idx) => {
+    const quantidade = Math.max(1, Number(item.quantidade || 1));
     const valor = item.isMarmita ? Number(item.valor ?? item.price ?? 0) : Number(item.price ?? 0);
     const desc = item.isMarmita
       ? `<div style="font-size:12px;color:#666">
@@ -146,20 +355,20 @@ function renderCarrinho() {
         ${desc}
         <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
           <button class="btn small" data-dec="${idx}" style="padding:2px 7px;">-</button>
-          <span style="font-size:13px;color:#888;min-width:22px;text-align:center;">${item.quantidade}</span>
+          <span style="font-size:13px;color:#888;min-width:22px;text-align:center;">${quantidade}</span>
           <button class="btn small" data-inc="${idx}" style="padding:2px 7px;">+</button>
         </div>
       </div>
-      <div style="font-weight:700">R$ ${(valor * item.quantidade).toFixed(2)}</div>
+      <div style="font-weight:700">R$ ${(valor * quantidade).toFixed(2)}</div>
       <button class="btn small" data-remove="${idx}" style="margin-left:5px;">X</button>
     `;
 
     itensCarrinhoEl.appendChild(itemHtml);
-    total += valor * item.quantidade;
+    total += valor * quantidade;
   });
 
   totalEl.textContent = total.toFixed(2);
-  contadorEl.textContent = String(carrinho.reduce((s, i) => s + i.quantidade, 0));
+  contadorEl.textContent = String(carrinho.reduce((s, i) => s + Math.max(1, Number(i.quantidade || 1)), 0));
 }
 
 if (itensCarrinhoEl) {
@@ -219,8 +428,72 @@ if (fecharCarrinhoBtn) {
   fecharCarrinhoBtn.onclick = () => carrinhoEl && carrinhoEl.classList.remove('open');
 }
 
+if (menuCategoriasToggleEl) {
+  menuCategoriasToggleEl.addEventListener('click', () => {
+    toggleCategoriasMenu();
+  });
+}
+
+if (menuUsuarioToggleEl) {
+  menuUsuarioToggleEl.addEventListener('click', () => {
+    toggleUsuarioMenu();
+  });
+}
+
+if (menuOverlayEl) {
+  menuOverlayEl.addEventListener('click', () => {
+    closeAllFloatingMenus();
+  });
+}
+
+if (menuCategoriasListaEl) {
+  menuCategoriasListaEl.addEventListener('click', (event) => {
+    const link = event.target.closest('[data-menu-target]');
+    if (!link) return;
+
+    event.preventDefault();
+    const targetId = String(link.getAttribute('data-menu-target') || '').trim();
+    if (!targetId) return;
+
+    scrollToCategorySection(targetId);
+    closeCategoriasMenu();
+  });
+}
+
+document.addEventListener('click', (event) => {
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+
+  if (
+    isCategoriasMenuOpen() &&
+    menuCategoriasEl &&
+    menuCategoriasToggleEl &&
+    !menuCategoriasEl.contains(target) &&
+    !menuCategoriasToggleEl.contains(target)
+  ) {
+    closeCategoriasMenu();
+  }
+
+  if (
+    isUsuarioMenuOpen() &&
+    menuUsuarioEl &&
+    menuUsuarioToggleEl &&
+    !menuUsuarioEl.contains(target) &&
+    !menuUsuarioToggleEl.contains(target)
+  ) {
+    closeUsuarioMenu();
+  }
+});
+
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') {
+    closeAllFloatingMenus();
+  }
+});
+
 function addToCart(produto) {
   carrinho = loadCart();
+  const quantidadeNova = Math.max(1, Number(produto?.quantidade || 1));
 
   if (produto.isMarmita) {
     const idx = carrinho.findIndex((item) =>
@@ -234,16 +507,16 @@ function addToCart(produto) {
     );
 
     if (idx >= 0) {
-      carrinho[idx].quantidade += produto.quantidade;
+      carrinho[idx].quantidade = Math.max(1, Number(carrinho[idx].quantidade || 1)) + quantidadeNova;
     } else {
-      carrinho.push({ ...produto });
+      carrinho.push({ ...produto, quantidade: quantidadeNova });
     }
   } else {
     const idx = carrinho.findIndex((item) => !item.isMarmita && item.id === produto.id);
     if (idx >= 0) {
-      carrinho[idx].quantidade += produto.quantidade;
+      carrinho[idx].quantidade = Math.max(1, Number(carrinho[idx].quantidade || 1)) + quantidadeNova;
     } else {
-      carrinho.push({ ...produto });
+      carrinho.push({ ...produto, quantidade: quantidadeNova });
     }
   }
 
@@ -256,6 +529,7 @@ window.addEventListener('produtosAtualizados', async () => {
 });
 
 window.addEventListener('DOMContentLoaded', async () => {
+  closeAllFloatingMenus();
   const params = new URLSearchParams(window.location.search);
   if (params.get('checkout') === 'ok') {
     alert('Pedido finalizado com sucesso!');

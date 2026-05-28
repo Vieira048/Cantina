@@ -7,6 +7,17 @@ ALTER TABLE usuarios
   MODIFY COLUMN senha VARCHAR(255) NOT NULL,
   MODIFY COLUMN tipo ENUM('aluno','funcionario','admin','cliente') NOT NULL DEFAULT 'cliente';
 
+ALTER TABLE usuarios
+  ADD COLUMN IF NOT EXISTS login VARCHAR(40) NULL AFTER email,
+  ADD COLUMN IF NOT EXISTS nick VARCHAR(60) NULL AFTER login,
+  ADD COLUMN IF NOT EXISTS data_nascimento DATE NULL AFTER tipo,
+  ADD COLUMN IF NOT EXISTS sexo ENUM('masculino','feminino','outro','nao_informado') NULL AFTER data_nascimento,
+  ADD COLUMN IF NOT EXISTS endereco VARCHAR(255) NULL AFTER sexo,
+  ADD COLUMN IF NOT EXISTS foto VARCHAR(255) NULL AFTER endereco,
+  ADD COLUMN IF NOT EXISTS descricao TEXT NULL AFTER foto;
+
+CREATE INDEX IF NOT EXISTS idx_usuarios_login ON usuarios (login);
+
 -- Estrutura nova de produtos sem remover estrutura antiga
 ALTER TABLE produtos
   ADD COLUMN IF NOT EXISTS categoria VARCHAR(50) NULL AFTER nome,
@@ -79,6 +90,27 @@ ALTER TABLE pagamentos
 CREATE INDEX IF NOT EXISTS idx_pagamentos_pedido ON pagamentos (pedido_id);
 CREATE INDEX IF NOT EXISTS idx_pagamentos_status ON pagamentos (status);
 
+-- Tabela para pedidos agendados exibidos no perfil do usuario
+CREATE TABLE IF NOT EXISTS pedidos_agendados (
+  id INT(11) NOT NULL AUTO_INCREMENT,
+  usuario_id INT(11) NOT NULL,
+  produto_nome VARCHAR(120) NOT NULL,
+  descricao TEXT NULL,
+  data_agendada DATETIME NOT NULL,
+  valor_total DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  status ENUM('agendado','concluido','cancelado') NOT NULL DEFAULT 'agendado',
+  criado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  atualizado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_pedidos_agendados_usuario (usuario_id),
+  KEY idx_pedidos_agendados_status (status),
+  KEY idx_pedidos_agendados_data (data_agendada),
+  CONSTRAINT fk_pedidos_agendados_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE INDEX IF NOT EXISTS idx_pedidos_agendados_usuario ON pedidos_agendados (usuario_id);
+CREATE INDEX IF NOT EXISTS idx_pedidos_agendados_status ON pedidos_agendados (status);
+CREATE INDEX IF NOT EXISTS idx_pedidos_agendados_data ON pedidos_agendados (data_agendada);
 -- Seed admin para testes
 INSERT INTO usuarios (nome, email, senha, tipo)
 SELECT 'Administrador', 'admin@cantina.local', '$2y$10$N1gjtDglWTZ2VI70kqH7uuoo7xvZueEXg5N/EK2SD0wExAlYh501G', 'admin'

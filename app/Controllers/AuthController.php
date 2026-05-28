@@ -74,7 +74,7 @@ final class AuthController extends Controller
             $this->redirect($this->buildLoginRedirect('erro=email_invalido&ctx=register', $nextTarget));
         }
 
-        if (strlen($senha) < 6) {
+        if (strlen($senha) < 8) {
             $this->redirect($this->buildLoginRedirect('erro=senha_curta&ctx=register', $nextTarget));
         }
 

@@ -2,9 +2,41 @@ function saveCart(cart) {
   localStorage.setItem('carrinho', JSON.stringify(cart));
 }
 
+function normalizeQty(item) {
+  const raw = item?.quantidade ?? item?.qtd ?? item?.qty ?? item?.quantity ?? 1;
+  const qty = Number(raw);
+  if (!Number.isFinite(qty) || qty <= 0) {
+    return 1;
+  }
+  return Math.max(1, Math.round(qty));
+}
+
+function normalizeCartItem(item) {
+  if (!item || typeof item !== 'object') {
+    return null;
+  }
+
+  const normalized = {
+    ...item,
+    quantidade: normalizeQty(item),
+  };
+
+  if (!normalized.name && normalized.nome) {
+    normalized.name = String(normalized.nome);
+  }
+
+  return normalized;
+}
+
 function loadCart() {
   try {
-    return JSON.parse(localStorage.getItem('carrinho') || '[]');
+    const raw = JSON.parse(localStorage.getItem('carrinho') || '[]');
+    if (!Array.isArray(raw)) {
+      return [];
+    }
+    return raw
+      .map(normalizeCartItem)
+      .filter((item) => item && item.quantidade > 0);
   } catch (e) {
     return [];
   }

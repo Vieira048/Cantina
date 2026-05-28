@@ -44,9 +44,23 @@ final class OrderApiController
 
     private function handleGet(): void
     {
+        $action = strtolower(trim((string) ($_GET['action'] ?? '')));
+        if ($action === 'meus_pedidos') {
+            $this->assertLoggedIn();
+            $userId = SessionAuth::userId();
+            if ($userId === null) {
+                JsonResponse::send(401, ['ok' => false, 'message' => 'Sessao invalida.']);
+            }
+
+            $filtro = trim((string) ($_GET['filtro'] ?? 'todos'));
+            JsonResponse::send(200, [
+                'ok' => true,
+                'data' => $this->orders->listMineGrouped($userId, $filtro, 300),
+            ]);
+        }
+
         $this->assertAdmin();
 
-        $action = strtolower(trim((string) ($_GET['action'] ?? '')));
         if ($action === 'dashboard') {
             $month = trim((string) ($_GET['month'] ?? ''));
             JsonResponse::send(200, [

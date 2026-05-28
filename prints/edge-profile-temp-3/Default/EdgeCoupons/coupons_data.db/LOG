@@ -1,0 +1,5 @@
+2026/05/27-16:25:45.748 7614 Creating DB C:\xampp\htdocs\Cantina\prints\edge-profile-temp-3\Default\EdgeCoupons/coupons_data.db since it was missing.
+2026/05/27-16:25:45.755 7614 Reusing MANIFEST C:\xampp\htdocs\Cantina\prints\edge-profile-temp-3\Default\EdgeCoupons/coupons_data.db/MANIFEST-000001
+2026/05/27-16:25:45.942 49a0 Level-0 table #5: started
+2026/05/27-16:25:45.949 49a0 Level-0 table #5: 682633 bytes OK
+2026/05/27-16:25:45.950 49a0 Delete type=0 #3

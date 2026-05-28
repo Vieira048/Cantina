@@ -5,27 +5,116 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Cantina - Home</title>
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css?v=menus_flutuantes_20260527_3" />
   <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
 </head>
 
 <body>
+  <?php
+    $nomeExibicao = trim((string) ($nomeUsuario ?? ''));
+    if ($nomeExibicao === '') {
+      $nomeExibicao = !empty($logado) ? 'Usuario' : 'Visitante';
+    }
+    $emailExibicao = trim((string) ($emailUsuario ?? ''));
+    if ($emailExibicao === '' && empty($logado)) {
+      $emailExibicao = 'gmail@gmail.com';
+    }
+    $fotoExibicao = trim((string) ($fotoUsuario ?? ''));
+    $temFoto = $fotoExibicao !== '';
+  ?>
   <header class="topbar">
+    <div class="topbar-left">
+      <button
+        id="menuCategoriasToggle"
+        class="menu-toggle"
+        type="button"
+        aria-label="Abrir menu de categorias"
+        aria-expanded="false"
+        aria-controls="menuCategorias"
+      >
+        <span class="hamburger-line"></span>
+        <span class="hamburger-line"></span>
+        <span class="hamburger-line"></span>
+      </button>
+    </div>
+
     <div class="logo">Cantina</div>
-    <nav>
-      <?php if (($tipoUsuario ?? null) === 'admin'): ?>
-        <a href="admin.php" class="btn link-admin">Painel ADM</a>
-      <?php endif; ?>
 
-      <?php if (!empty($logado)): ?>
-        <a href="deslogar.php" class="btn link-login">Deslogar</a>
-      <?php else: ?>
-        <a href="login.php" class="btn link-login">Login / Registrar</a>
-      <?php endif; ?>
-
+    <nav class="topbar-right">
+      <button
+        id="menuUsuarioToggle"
+        class="btn btn-user"
+        type="button"
+        aria-label="Abrir menu do usuario"
+        aria-expanded="false"
+        aria-controls="menuUsuario"
+      >
+        <span class="user-chip-avatar <?php echo $temFoto ? 'has-photo' : ''; ?>" aria-hidden="true">
+          <?php if ($temFoto): ?>
+            <img class="user-avatar-img" src="<?php echo htmlspecialchars($fotoExibicao, ENT_QUOTES, 'UTF-8'); ?>" alt="">
+          <?php endif; ?>
+        </span>
+        <span class="user-chip-text">
+          <span class="user-chip-name"><?php echo htmlspecialchars($nomeExibicao, ENT_QUOTES, 'UTF-8'); ?></span>
+          <?php if ($emailExibicao !== ''): ?>
+            <span class="user-chip-email"><?php echo htmlspecialchars($emailExibicao, ENT_QUOTES, 'UTF-8'); ?></span>
+          <?php endif; ?>
+        </span>
+      </button>
       <button id="abrirCarrinho" class="btn">Carrinho (<span id="contador">0</span>)</button>
     </nav>
   </header>
+
+  <div id="menuOverlay" class="menu-overlay" hidden></div>
+
+  <aside id="menuCategorias" class="floating-menu left-menu" aria-hidden="true" hidden>
+    <div class="floating-menu-header">
+      <h2>Categorias</h2>
+    </div>
+    <nav id="menuCategoriasLista" class="floating-menu-list">
+      <a href="#salgados" class="menu-item menu-item-link" data-menu-target="salgados">Salgados</a>
+      <a href="#marmitas" class="menu-item menu-item-link" data-menu-target="marmitas">Marmitas</a>
+      <a href="#bebidas" class="menu-item menu-item-link" data-menu-target="bebidas">Bebidas</a>
+    </nav>
+  </aside>
+
+  <aside id="menuUsuario" class="floating-menu right-menu user-menu" aria-hidden="true" hidden>
+    <div class="user-menu-top">
+      <div class="user-menu-identity">
+        <span class="user-panel-avatar <?php echo $temFoto ? 'has-photo' : ''; ?>" aria-hidden="true">
+          <?php if ($temFoto): ?>
+            <img class="user-avatar-img" src="<?php echo htmlspecialchars($fotoExibicao, ENT_QUOTES, 'UTF-8'); ?>" alt="">
+          <?php endif; ?>
+        </span>
+        <div class="user-menu-meta">
+          <div class="user-menu-title"><?php echo htmlspecialchars($nomeExibicao, ENT_QUOTES, 'UTF-8'); ?></div>
+          <?php if ($emailExibicao !== ''): ?>
+            <div class="user-menu-email"><?php echo htmlspecialchars($emailExibicao, ENT_QUOTES, 'UTF-8'); ?></div>
+          <?php endif; ?>
+        </div>
+      </div>
+
+      <div class="user-menu-action">
+        <?php if (!empty($logado)): ?>
+          <a href="deslogar.php" class="user-logout-btn">Sair</a>
+        <?php else: ?>
+          <a href="login.php" class="user-logout-btn">Entrar</a>
+        <?php endif; ?>
+      </div>
+    </div>
+
+    <nav class="floating-menu-list user-panel-links">
+      <?php if (!empty($logado)): ?>
+        <a href="perfil.php" class="menu-item menu-item-link user-panel-link">Perfil</a>
+        <a href="meus_pedidos.php" class="menu-item menu-item-link user-panel-link">Meus pedidos</a>
+        <?php if (($tipoUsuario ?? null) === 'admin'): ?>
+          <a href="admin.php" class="menu-item menu-item-link user-panel-link">painel de admin</a>
+        <?php endif; ?>
+      <?php else: ?>
+        <a href="login.php" class="menu-item menu-item-link user-panel-link">Login / Registrar</a>
+      <?php endif; ?>
+    </nav>
+  </aside>
 
   <main class="container">
     <section class="hero">
@@ -55,7 +144,7 @@
     </div>
   </aside>
 
-  <script src="script.js"></script>
+  <script src="script.js?v=menus_flutuantes_20260527_3"></script>
 </body>
 
 <footer class="footer">

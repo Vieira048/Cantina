@@ -1,4 +1,4 @@
-const ordersListEl = document.getElementById('ordersList');
+﻿const ordersListEl = document.getElementById('ordersList');
 const ordersStatusEl = document.getElementById('ordersStatus');
 const reportBarsEl = document.getElementById('reportBars');
 const reportMonthEl = document.getElementById('reportMonth');
@@ -70,6 +70,15 @@ function normalizeItemText(item) {
   const qty = Math.max(1, Number(item.quantidade || 1));
   const subtotal = Number(item.subtotal || (qty * Number(item.preco_unitario || 0)));
   return `${qty}x ${name} - ${brl(subtotal)}`;
+}
+
+function itemDescriptionHtml(item) {
+  const description = String(item?.descricao || '').trim();
+  if (description === '') {
+    return '';
+  }
+
+  return `<div class="item-desc">${escapeHtml(description)}</div>`;
 }
 
 function paymentTypeLabel(type) {
@@ -147,6 +156,7 @@ function renderOrders(orders) {
         ${items.map((item) => `
           <li>
             <div class="item-line">${escapeHtml(normalizeItemText(item))}</div>
+            ${itemDescriptionHtml(item)}
             ${buildItemConfigHtml(item.configuracao)}
           </li>
         `).join('')}

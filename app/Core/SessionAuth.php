@@ -50,6 +50,7 @@ final class SessionAuth
         $_SESSION['nome'] = (string) $user['nome'];
         $_SESSION['email'] = (string) $user['email'];
         $_SESSION['tipo'] = (string) $user['tipo'];
+        $_SESSION['foto'] = isset($user['foto']) ? (string) $user['foto'] : '';
     }
 
     public static function requireLogin(string $redirect = 'login.php?erro=login'): void

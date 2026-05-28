@@ -117,6 +117,89 @@ final class OrderModel
         return $orders;
     }
 
+    public function listMineGrouped(int $userId, ?string $filter = null, int $limit = 200): array
+    {
+        if ($userId <= 0) {
+            return [
+                'pedidos_atuais' => [],
+                'historico' => [],
+            ];
+        }
+
+        $limit = max(1, $limit);
+        $column = $this->orderCreatedAtColumn;
+
+        $sql = "SELECT p.id, p.usuario_id, p.valor_total, p.status, p.$column AS criado_em, u.nome AS usuario_nome, u.email AS usuario_email
+                FROM pedidos p
+                LEFT JOIN usuarios u ON u.id = p.usuario_id
+                WHERE p.usuario_id = ?
+                ORDER BY p.$column DESC, p.id DESC
+                LIMIT ?";
+
+        $stmt = $this->conn->prepare($sql);
+        $stmt->bind_param('ii', $userId, $limit);
+        $stmt->execute();
+
+        $result = $stmt->get_result();
+        $orders = [];
+        $orderIds = [];
+
+        while ($row = $result->fetch_assoc()) {
+            $orderId = (int) $row['id'];
+            $orderIds[] = $orderId;
+            $orders[] = [
+                'id' => $orderId,
+                'usuario_id' => $row['usuario_id'] !== null ? (int) $row['usuario_id'] : null,
+                'usuario_nome' => (string) ($row['usuario_nome'] ?? ''),
+                'usuario_email' => (string) ($row['usuario_email'] ?? ''),
+                'valor_total' => (float) $row['valor_total'],
+                'status' => (string) $row['status'],
+                'criado_em' => (string) $row['criado_em'],
+                'itens' => [],
+                'pagamento' => null,
+            ];
+        }
+
+        if ($orderIds === []) {
+            return [
+                'pedidos_atuais' => [],
+                'historico' => [],
+            ];
+        }
+
+        $itemsByOrder = $this->loadItemsByOrderIds($orderIds);
+        $paymentsByOrder = $this->loadPaymentsByOrderIds($orderIds);
+
+        foreach ($orders as &$order) {
+            $order['itens'] = $itemsByOrder[$order['id']] ?? [];
+            $order['pagamento'] = $paymentsByOrder[$order['id']] ?? null;
+        }
+        unset($order);
+
+        $normalizedFilter = $this->normalizeCustomerFilter($filter);
+        if ($normalizedFilter !== 'todos') {
+            $orders = array_values(array_filter($orders, fn (array $order): bool => $this->matchesCustomerFilter($order, $normalizedFilter)));
+        }
+
+        $historicalStatuses = $this->resolveHistoricalStatuses();
+        $current = [];
+        $history = [];
+
+        foreach ($orders as $order) {
+            $status = strtolower(trim((string) ($order['status'] ?? '')));
+            if (in_array($status, $historicalStatuses, true)) {
+                $history[] = $order;
+            } else {
+                $current[] = $order;
+            }
+        }
+
+        return [
+            'pedidos_atuais' => $current,
+            'historico' => $history,
+        ];
+    }
+
     public function markAsDelivered(int $orderId): bool
     {
         if ($orderId <= 0) {
@@ -289,10 +372,16 @@ final class OrderModel
         }
 
         $idList = implode(',', $cleanIds);
-        $sql = "SELECT pedido_id, nome_produto, quantidade, preco_unitario, configuracao
-                FROM pedido_itens
-                WHERE pedido_id IN ($idList)
-                ORDER BY id ASC";
+        $sql = "SELECT pi.pedido_id,
+                       pi.nome_produto,
+                       pi.quantidade,
+                       pi.preco_unitario,
+                       pi.configuracao,
+                       COALESCE(NULLIF(TRIM(pr.descricao), ''), '') AS descricao_produto
+                FROM pedido_itens pi
+                LEFT JOIN produtos pr ON pr.id = pi.produto_id
+                WHERE pi.pedido_id IN ($idList)
+                ORDER BY pi.id ASC";
 
         $result = $this->conn->query($sql);
         $itemsByOrder = [];
@@ -317,6 +406,7 @@ final class OrderModel
 
             $itemsByOrder[$orderId][] = [
                 'nome' => (string) ($row['nome_produto'] ?? 'Item'),
+                'descricao' => (string) ($row['descricao_produto'] ?? ''),
                 'quantidade' => $qty,
                 'preco_unitario' => $unit,
                 'subtotal' => $qty * $unit,
@@ -440,6 +530,69 @@ final class OrderModel
         }
 
         return 'finalizado';
+    }
+
+    /**
+     * @return string[]
+     */
+    private function resolveHistoricalStatuses(): array
+    {
+        $values = ['cancelado', 'entregue', 'finalizado', $this->resolveDeliveredStatus()];
+        $clean = [];
+
+        foreach ($values as $value) {
+            $status = strtolower(trim((string) $value));
+            if ($status !== '') {
+                $clean[] = $status;
+            }
+        }
+
+        return array_values(array_unique($clean));
+    }
+
+    private function normalizeCustomerFilter(?string $filter): string
+    {
+        $value = strtolower(trim((string) $filter));
+        if ($value === '') {
+            return 'todos';
+        }
+
+        $allowed = ['todos', 'pendentes', 'entregues', 'cancelados', 'pagos', 'nao_pagos'];
+        if (!in_array($value, $allowed, true)) {
+            return 'todos';
+        }
+
+        return $value;
+    }
+
+    private function matchesCustomerFilter(array $order, string $filter): bool
+    {
+        $status = strtolower(trim((string) ($order['status'] ?? '')));
+        $paymentStatus = strtolower(trim((string) ($order['pagamento']['status'] ?? '')));
+        $historicalStatuses = $this->resolveHistoricalStatuses();
+        $deliveredStatuses = array_values(array_unique(['finalizado', 'entregue', $this->resolveDeliveredStatus()]));
+
+        if ($filter === 'pendentes') {
+            return !in_array($status, $historicalStatuses, true);
+        }
+
+        if ($filter === 'entregues') {
+            return in_array($status, $deliveredStatuses, true);
+        }
+
+        if ($filter === 'cancelados') {
+            return $status === 'cancelado';
+        }
+
+        if ($filter === 'pagos') {
+            return $paymentStatus === 'pago';
+        }
+
+        if ($filter === 'nao_pagos') {
+            return $paymentStatus !== 'pago';
+        }
+
+        return true;
     }
 
     private function quoteStringList(array $values): string

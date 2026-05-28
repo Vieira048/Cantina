@@ -21,9 +21,10 @@ final class AuthController extends Controller
     public function login(): void
     {
         SessionAuth::start();
+        $nextTarget = $this->resolveNextTarget();
 
         if (SessionAuth::isLoggedIn()) {
-            $this->redirect('index.php');
+            $this->redirect($nextTarget ?? 'index.php');
         }
 
         if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'POST') {
@@ -31,32 +32,34 @@ final class AuthController extends Controller
             $senha = (string) ($_POST['senha'] ?? '');
 
             if ($email === '' || $senha === '') {
-                $this->redirect('login.php?erro=campos');
+                $this->redirect($this->buildLoginRedirect('erro=campos', $nextTarget));
             }
 
             try {
                 $usuario = $this->users->findByEmail($email);
                 if (!$usuario || !password_verify($senha, (string) $usuario['senha'])) {
-                    $this->redirect('login.php?erro=credenciais');
+                    $this->redirect($this->buildLoginRedirect('erro=credenciais', $nextTarget));
                 }
 
                 SessionAuth::login($usuario);
-                $this->redirect('index.php');
+                $this->redirect($nextTarget ?? 'index.php');
             } catch (Throwable $e) {
-                $this->redirect('login.php?erro=sistema');
+                $this->redirect($this->buildLoginRedirect('erro=sistema', $nextTarget));
             }
         }
 
         $this->render('auth/login', [
             'mensagem' => $this->resolveMessage(),
             'showRegister' => ((string) ($_GET['ctx'] ?? '')) === 'register',
+            'nextTarget' => $nextTarget,
         ]);
     }
 
     public function register(): void
     {
+        $nextTarget = $this->resolveNextTarget();
         if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')) !== 'POST') {
-            $this->redirect('login.php');
+            $this->redirect($this->buildLoginRedirect('', $nextTarget));
         }
 
         $nome = trim((string) ($_POST['nome'] ?? ''));
@@ -64,43 +67,43 @@ final class AuthController extends Controller
         $senha = (string) ($_POST['senha'] ?? '');
 
         if ($nome === '' || $email === '' || $senha === '') {
-            $this->redirect('login.php?erro=campos&ctx=register');
+            $this->redirect($this->buildLoginRedirect('erro=campos&ctx=register', $nextTarget));
         }
 
         if (!$this->isEmailFormatoValido($email)) {
-            $this->redirect('login.php?erro=email_invalido&ctx=register');
+            $this->redirect($this->buildLoginRedirect('erro=email_invalido&ctx=register', $nextTarget));
         }
 
         if (strlen($senha) < 6) {
-            $this->redirect('login.php?erro=senha_curta&ctx=register');
+            $this->redirect($this->buildLoginRedirect('erro=senha_curta&ctx=register', $nextTarget));
         }
 
         try {
             if ($this->users->emailExists($email)) {
-                $this->redirect('login.php?erro=email_existe&ctx=register');
+                $this->redirect($this->buildLoginRedirect('erro=email_existe&ctx=register', $nextTarget));
             }
 
             $hash = password_hash($senha, PASSWORD_DEFAULT);
             $this->users->create($nome, $email, $hash);
-            $this->redirect('login.php?cad=ok');
+            $this->redirect($this->buildLoginRedirect('cad=ok', $nextTarget));
         } catch (mysqli_sql_exception $e) {
             if ($e->getCode() === 1062) {
-                $this->redirect('login.php?erro=email_existe&ctx=register');
+                $this->redirect($this->buildLoginRedirect('erro=email_existe&ctx=register', $nextTarget));
             }
 
             if ($e->getCode() === 1406) {
-                $this->redirect('login.php?erro=email_grande&ctx=register');
+                $this->redirect($this->buildLoginRedirect('erro=email_grande&ctx=register', $nextTarget));
             }
 
             if (in_array($e->getCode(), [1265, 1366], true)) {
-                $this->redirect('login.php?erro=schema_incompativel&ctx=register');
+                $this->redirect($this->buildLoginRedirect('erro=schema_incompativel&ctx=register', $nextTarget));
             }
 
             error_log('Erro SQL no cadastro: ' . $e->getMessage());
-            $this->redirect('login.php?erro=sistema');
+            $this->redirect($this->buildLoginRedirect('erro=sistema', $nextTarget));
         } catch (Throwable $e) {
             error_log('Erro inesperado no cadastro: ' . $e->getMessage());
-            $this->redirect('login.php?erro=sistema');
+            $this->redirect($this->buildLoginRedirect('erro=sistema', $nextTarget));
         }
     }
 
@@ -172,5 +175,67 @@ final class AuthController extends Controller
         $domain = trim($parts[1]);
 
         return $local !== '' && $domain !== '';
+    }
+
+    private function resolveNextTarget(): ?string
+    {
+        $sources = [
+            (string) ($_POST['next'] ?? ''),
+            (string) ($_GET['next'] ?? ''),
+        ];
+
+        foreach ($sources as $candidate) {
+            $candidate = trim($candidate);
+            if ($candidate === '') {
+                continue;
+            }
+
+            if ($this->isSafeNextTarget($candidate)) {
+                return $candidate;
+            }
+        }
+
+        return null;
+    }
+
+    private function isSafeNextTarget(string $target): bool
+    {
+        if ($target === '' || strlen($target) > 200) {
+            return false;
+        }
+
+        if (preg_match('#^https?://#i', $target) === 1) {
+            return false;
+        }
+
+        if (strpos($target, '//') === 0 || strpos($target, '\\') !== false) {
+            return false;
+        }
+
+        if (strpos($target, "\n") !== false || strpos($target, "\r") !== false) {
+            return false;
+        }
+
+        if (strpos($target, '.php') === false) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private function buildLoginRedirect(string $query, ?string $nextTarget): string
+    {
+        $url = 'login.php';
+        $params = trim($query);
+
+        if ($params !== '') {
+            $url .= '?' . $params;
+        }
+
+        if ($nextTarget !== null && $nextTarget !== '') {
+            $url .= ($params === '' ? '?' : '&') . 'next=' . rawurlencode($nextTarget);
+        }
+
+        return $url;
     }
 }

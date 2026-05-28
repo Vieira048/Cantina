@@ -144,7 +144,11 @@ function renderCarrinho() {
       <div style="flex:1">
         <div style="font-weight:600">${escapeHtml(item.name)}</div>
         ${desc}
-        <div style="font-size:13px;color:#888">Qtd: ${item.quantidade}</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
+          <button class="btn small" data-dec="${idx}" style="padding:2px 7px;">-</button>
+          <span style="font-size:13px;color:#888;min-width:22px;text-align:center;">${item.quantidade}</span>
+          <button class="btn small" data-inc="${idx}" style="padding:2px 7px;">+</button>
+        </div>
       </div>
       <div style="font-weight:700">R$ ${(valor * item.quantidade).toFixed(2)}</div>
       <button class="btn small" data-remove="${idx}" style="margin-left:5px;">X</button>
@@ -160,13 +164,27 @@ function renderCarrinho() {
 
 if (itensCarrinhoEl) {
   itensCarrinhoEl.addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-remove]');
+    const btn = e.target.closest('[data-remove],[data-inc],[data-dec]');
     if (!btn) return;
 
-    const idx = Number(btn.getAttribute('data-remove'));
+    const idx = Number(btn.getAttribute('data-remove') ?? btn.getAttribute('data-inc') ?? btn.getAttribute('data-dec'));
     if (!Number.isInteger(idx)) return;
 
-    carrinho.splice(idx, 1);
+    if (!carrinho[idx]) return;
+
+    if (btn.hasAttribute('data-remove')) {
+      carrinho.splice(idx, 1);
+    } else if (btn.hasAttribute('data-inc')) {
+      carrinho[idx].quantidade = Math.max(1, Number(carrinho[idx].quantidade || 1) + 1);
+    } else if (btn.hasAttribute('data-dec')) {
+      const novaQtd = Number(carrinho[idx].quantidade || 1) - 1;
+      if (novaQtd <= 0) {
+        carrinho.splice(idx, 1);
+      } else {
+        carrinho[idx].quantidade = novaQtd;
+      }
+    }
+
     saveCart(carrinho);
     renderCarrinho();
   });
@@ -189,53 +207,7 @@ if (finalizarBtn) {
       return;
     }
 
-    const itensApi = carrinho.map((it) => ({
-      id_produto: Number(it.id),
-      nome_produto: String(it.name || ''),
-      quantidade: Number(it.quantidade || 1),
-      preco_unitario: Number(it.isMarmita ? (it.valor ?? it.price ?? 0) : (it.price ?? 0)),
-      configuracao: it.isMarmita
-        ? {
-            tamanho: it.tamanho || null,
-            carbo: it.carbo || null,
-            proteinas: Array.isArray(it.proteinas) ? it.proteinas : [],
-            saladas: Array.isArray(it.saladas) ? it.saladas : [],
-            adicionais: Array.isArray(it.adicionais) ? it.adicionais : [],
-          }
-        : null,
-    }));
-
-    try {
-      const res = await fetch('api/pedidos.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ itens: itensApi }),
-      });
-
-      let payload = {};
-      try {
-        payload = await res.json();
-      } catch (_err) {
-        payload = {};
-      }
-
-      if (!res.ok || !payload.ok) {
-        if (res.status === 401) {
-          alert('Faca login para finalizar seu pedido.');
-          window.location.href = 'login.php';
-          return;
-        }
-        throw new Error(payload.message || 'Erro ao finalizar pedido.');
-      }
-
-      alert('Pedido finalizado com sucesso!');
-      carrinho = [];
-      saveCart(carrinho);
-      renderCarrinho();
-    } catch (err) {
-      console.error(err);
-      alert(err.message || 'Erro ao finalizar pedido.');
-    }
+    window.location.href = 'finalizar_compra.php';
   };
 }
 
@@ -284,6 +256,15 @@ window.addEventListener('produtosAtualizados', async () => {
 });
 
 window.addEventListener('DOMContentLoaded', async () => {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('checkout') === 'ok') {
+    alert('Pedido finalizado com sucesso!');
+    params.delete('checkout');
+    const qs = params.toString();
+    const target = `${window.location.pathname}${qs ? `?${qs}` : ''}`;
+    window.history.replaceState({}, '', target);
+  }
+
   await renderProdutos();
   renderCarrinho();
 });

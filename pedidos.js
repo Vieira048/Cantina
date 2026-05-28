@@ -72,6 +72,47 @@ function normalizeItemText(item) {
   return `${qty}x ${name} - ${brl(subtotal)}`;
 }
 
+function paymentTypeLabel(type) {
+  const t = String(type || '').toLowerCase().trim();
+  if (t === 'dinheiro') return 'Dinheiro';
+  if (t === 'cartao') return 'Cartao';
+  if (t === 'pix') return 'Pix';
+  return t || 'Nao informado';
+}
+
+function paymentStatusLabel(status) {
+  const s = String(status || '').toLowerCase().trim();
+  if (s === 'pendente') return 'Pendente';
+  if (s === 'pago') return 'Pago';
+  if (s === 'cancelado') return 'Cancelado';
+  return s || '';
+}
+
+function buildItemConfigHtml(configuration) {
+  if (!configuration || typeof configuration !== 'object') {
+    return '';
+  }
+
+  const lines = [];
+  const tamanho = String(configuration.tamanho || '').trim();
+  const carbo = String(configuration.carbo || '').trim();
+  const proteinas = Array.isArray(configuration.proteinas) ? configuration.proteinas : [];
+  const saladas = Array.isArray(configuration.saladas) ? configuration.saladas : [];
+  const adicionais = Array.isArray(configuration.adicionais) ? configuration.adicionais : [];
+
+  if (tamanho !== '') lines.push(`<div><b>Tamanho:</b> ${escapeHtml(tamanho)}</div>`);
+  if (carbo !== '') lines.push(`<div><b>Carbo:</b> ${escapeHtml(carbo)}</div>`);
+  if (proteinas.length > 0) lines.push(`<div><b>Proteinas:</b> ${proteinas.map(escapeHtml).join(', ')}</div>`);
+  if (saladas.length > 0) lines.push(`<div><b>Saladas:</b> ${saladas.map(escapeHtml).join(', ')}</div>`);
+  if (adicionais.length > 0) lines.push(`<div><b>Adicionais:</b> ${adicionais.map(escapeHtml).join(', ')}</div>`);
+
+  if (lines.length === 0) {
+    return '';
+  }
+
+  return `<div class="item-config">${lines.join('')}</div>`;
+}
+
 function renderOrders(orders) {
   ordersListEl.innerHTML = '';
 
@@ -88,6 +129,11 @@ function renderOrders(orders) {
     const clientName = String(order.usuario_nome || '').trim() || String(order.usuario_email || '').trim() || 'Usuario sem nome';
     const total = brl(order.valor_total || 0);
     const items = Array.isArray(order.itens) ? order.itens : [];
+    const paymentType = String(order.pagamento?.tipo || '').trim();
+    const paymentStatus = String(order.pagamento?.status || '').trim();
+    const paymentText = paymentType
+      ? `${paymentTypeLabel(paymentType)}${paymentStatus ? ` (${paymentStatusLabel(paymentStatus)})` : ''}`
+      : 'Nao informado';
 
     const card = document.createElement('article');
     card.className = 'order-card';
@@ -95,9 +141,15 @@ function renderOrders(orders) {
       <h3 class="order-title">Pedido #${id}</h3>
       <div class="order-meta">Cliente: ${escapeHtml(clientName)}</div>
       <div class="order-meta">Valor: ${escapeHtml(total)}</div>
+      <div class="order-meta">Pagamento: ${escapeHtml(paymentText)}</div>
       <h4 class="order-items-title">Itens</h4>
       <ul class="order-items">
-        ${items.map((item) => `<li>${escapeHtml(normalizeItemText(item))}</li>`).join('')}
+        ${items.map((item) => `
+          <li>
+            <div class="item-line">${escapeHtml(normalizeItemText(item))}</div>
+            ${buildItemConfigHtml(item.configuracao)}
+          </li>
+        `).join('')}
       </ul>
       <button type="button" class="btn-deliver" data-order-id="${id}">Entregue</button>
     `;

@@ -131,6 +131,25 @@
       margin-top: 5px;
     }
 
+    .item-line {
+      font-weight: 700;
+      font-size: 0.94rem;
+    }
+
+    .item-config {
+      margin-top: 4px;
+      font-size: 0.82rem;
+      line-height: 1.35;
+      color: #2e1a11;
+      background: rgba(217, 204, 197, 0.45);
+      border-radius: 8px;
+      padding: 6px 8px;
+    }
+
+    .item-config b {
+      font-weight: 700;
+    }
+
     .btn-deliver {
       display: block;
       width: 74%;

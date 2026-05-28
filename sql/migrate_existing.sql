@@ -57,6 +57,28 @@ CREATE TABLE IF NOT EXISTS pedido_itens (
   CONSTRAINT fk_pedido_itens_produto FOREIGN KEY (produto_id) REFERENCES produtos(id) ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+-- Tabela de pagamentos para checkout
+CREATE TABLE IF NOT EXISTS pagamentos (
+  id INT(11) NOT NULL AUTO_INCREMENT,
+  pedido_id INT(11) NOT NULL,
+  tipo ENUM('dinheiro','cartao','pix') NOT NULL,
+  status ENUM('pendente','pago','cancelado') NOT NULL DEFAULT 'pendente',
+  criado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_pagamentos_pedido (pedido_id),
+  KEY idx_pagamentos_status (status),
+  CONSTRAINT fk_pagamentos_pedido FOREIGN KEY (pedido_id) REFERENCES pedidos(id) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+ALTER TABLE pagamentos
+  ADD COLUMN IF NOT EXISTS pedido_id INT(11) NULL,
+  ADD COLUMN IF NOT EXISTS tipo ENUM('dinheiro','cartao','pix') NULL,
+  ADD COLUMN IF NOT EXISTS status ENUM('pendente','pago','cancelado') NOT NULL DEFAULT 'pendente',
+  ADD COLUMN IF NOT EXISTS criado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP;
+
+CREATE INDEX IF NOT EXISTS idx_pagamentos_pedido ON pagamentos (pedido_id);
+CREATE INDEX IF NOT EXISTS idx_pagamentos_status ON pagamentos (status);
+
 -- Seed admin para testes
 INSERT INTO usuarios (nome, email, senha, tipo)
 SELECT 'Administrador', 'admin@cantina.local', '$2y$10$N1gjtDglWTZ2VI70kqH7uuoo7xvZueEXg5N/EK2SD0wExAlYh501G', 'admin'

@@ -83,9 +83,18 @@ final class OrderApiController
         $this->assertLoggedIn();
         $data = $this->readJsonBody();
         $items = $data['itens'] ?? [];
+        $payment = $data['pagamento'] ?? null;
+        $paymentType = null;
 
         if (!is_array($items) || count($items) === 0) {
             JsonResponse::send(422, ['ok' => false, 'message' => 'Pedido sem itens.']);
+        }
+
+        if ($payment !== null) {
+            if (!is_array($payment)) {
+                JsonResponse::send(422, ['ok' => false, 'message' => 'Dados de pagamento invalidos.']);
+            }
+            $paymentType = isset($payment['tipo']) ? trim((string) $payment['tipo']) : null;
         }
 
         $userId = SessionAuth::userId();
@@ -94,7 +103,7 @@ final class OrderApiController
         }
 
         try {
-            $result = $this->orders->createFromItems($userId, $items);
+            $result = $this->orders->createFromItems($userId, $items, $paymentType);
         } catch (RuntimeException $e) {
             JsonResponse::send(422, ['ok' => false, 'message' => $e->getMessage()]);
         }

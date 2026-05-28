@@ -88,6 +88,8 @@
 </head>
 
 <body data-open-register="<?php echo !empty($showRegister) ? '1' : '0'; ?>">
+  <?php $nextValue = isset($nextTarget) ? trim((string) $nextTarget) : ''; ?>
+  <?php $registerAction = 'register.php' . ($nextValue !== '' ? ('?next=' . rawurlencode($nextValue)) : ''); ?>
   <header class="topbar">
     <div class="logo">Cantina</div>
   </header>
@@ -105,6 +107,9 @@
 
       <form id="loginForm" method="post" action="login.php">
         <h2>Entrar</h2>
+        <?php if ($nextValue !== ''): ?>
+          <input type="hidden" name="next" value="<?php echo htmlspecialchars($nextValue, ENT_QUOTES, 'UTF-8'); ?>" />
+        <?php endif; ?>
         <div class="field"><label>Email</label><input id="loginEmail" name="email" type="email" required /></div>
         <div class="field"><label>Senha</label><input id="loginSenha" name="senha" type="password" required /></div>
         <div style="display:flex;gap:8px;align-items:center">
@@ -114,8 +119,11 @@
         <div id="loginMsg" class="note"></div>
       </form>
 
-      <form id="registerForm" style="display:none" method="post" action="register.php">
+      <form id="registerForm" style="display:none" method="post" action="<?php echo htmlspecialchars($registerAction, ENT_QUOTES, 'UTF-8'); ?>">
         <h2>Cadastrar</h2>
+        <?php if ($nextValue !== ''): ?>
+          <input type="hidden" name="next" value="<?php echo htmlspecialchars($nextValue, ENT_QUOTES, 'UTF-8'); ?>" />
+        <?php endif; ?>
         <div class="field"><label>Nome</label><input id="regNome" name="nome" required /></div>
         <div class="field"><label>Email</label><input id="regEmail" name="email" type="email" required /></div>
         <div class="field"><label>Senha</label><input id="regSenha" name="senha" type="password" required minlength="6" /></div>

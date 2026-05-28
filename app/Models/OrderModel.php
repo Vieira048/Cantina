@@ -15,12 +15,17 @@ final class OrderModel
     private string $orderCreatedAtColumn;
     /** @var string[] */
     private array $orderStatusOptions;
+    /** @var string[] */
+    private array $paymentTypeOptions;
+    private bool $paymentsTableReady;
 
     public function __construct()
     {
         $this->conn = Database::connection();
         $this->orderCreatedAtColumn = $this->detectCreatedAtColumn();
         $this->orderStatusOptions = $this->detectStatusOptions();
+        $this->paymentTypeOptions = $this->detectPaymentTypeOptions();
+        $this->paymentsTableReady = $this->detectPaymentsTableReady();
     }
 
     public function listRecentWithUser(int $limit = 100): array
@@ -93,6 +98,7 @@ final class OrderModel
                 'status' => (string) $row['status'],
                 'criado_em' => (string) $row['criado_em'],
                 'itens' => [],
+                'pagamento' => null,
             ];
         }
 
@@ -101,8 +107,10 @@ final class OrderModel
         }
 
         $itemsByOrder = $this->loadItemsByOrderIds($orderIds);
+        $paymentsByOrder = $this->loadPaymentsByOrderIds($orderIds);
         foreach ($orders as &$order) {
             $order['itens'] = $itemsByOrder[$order['id']] ?? [];
+            $order['pagamento'] = $paymentsByOrder[$order['id']] ?? null;
         }
         unset($order);
 
@@ -180,8 +188,13 @@ final class OrderModel
         ];
     }
 
-    public function createFromItems(int $usuarioId, array $items): array
+    public function createFromItems(int $usuarioId, array $items, ?string $paymentType = null): array
     {
+        if (!$this->paymentsTableReady) {
+            throw new RuntimeException('Banco sem estrutura de pagamento. Rode o arquivo sql/migrate_existing.sql.');
+        }
+
+        $resolvedPaymentType = $this->resolvePaymentType($paymentType);
         $this->conn->begin_transaction();
 
         try {
@@ -244,11 +257,19 @@ final class OrderModel
             $stmtUpdate->bind_param('di', $valorTotal, $orderId);
             $stmtUpdate->execute();
 
+            $paymentStatus = 'pendente';
+            $stmtPayment = $this->conn->prepare('INSERT INTO pagamentos (pedido_id, tipo, status) VALUES (?, ?, ?)');
+            $stmtPayment->bind_param('iss', $orderId, $resolvedPaymentType, $paymentStatus);
+            $stmtPayment->execute();
+            $paymentId = (int) $stmtPayment->insert_id;
+
             $this->conn->commit();
 
             return [
                 'pedido_id' => $orderId,
                 'valor_total' => $valorTotal,
+                'pagamento_id' => $paymentId,
+                'pagamento_tipo' => $resolvedPaymentType,
             ];
         } catch (Throwable $e) {
             $this->conn->rollback();
@@ -304,6 +325,48 @@ final class OrderModel
         }
 
         return $itemsByOrder;
+    }
+
+    private function loadPaymentsByOrderIds(array $orderIds): array
+    {
+        if ($orderIds === [] || !$this->paymentsTableReady) {
+            return [];
+        }
+
+        $cleanIds = array_values(array_unique(array_map(static fn ($id): int => (int) $id, $orderIds)));
+        if ($cleanIds === []) {
+            return [];
+        }
+
+        $idList = implode(',', $cleanIds);
+        $sql = "SELECT pg.pedido_id, pg.tipo, pg.status
+                FROM pagamentos pg
+                INNER JOIN (
+                  SELECT pedido_id, MAX(id) AS max_id
+                  FROM pagamentos
+                  WHERE pedido_id IN ($idList)
+                  GROUP BY pedido_id
+                ) latest ON latest.max_id = pg.id";
+
+        $result = $this->conn->query($sql);
+        if (!$result) {
+            return [];
+        }
+
+        $paymentsByOrder = [];
+        while ($row = $result->fetch_assoc()) {
+            $orderId = (int) ($row['pedido_id'] ?? 0);
+            if ($orderId <= 0) {
+                continue;
+            }
+
+            $paymentsByOrder[$orderId] = [
+                'tipo' => (string) ($row['tipo'] ?? ''),
+                'status' => (string) ($row['status'] ?? ''),
+            ];
+        }
+
+        return $paymentsByOrder;
     }
 
     private function buildMonthRange(?string $monthRef): array
@@ -442,5 +505,92 @@ final class OrderModel
         }
 
         return 'data_pedido';
+    }
+
+    private function resolvePaymentType(?string $paymentType): string
+    {
+        $paymentType = strtolower(trim((string) $paymentType));
+        if ($paymentType === '') {
+            return 'dinheiro';
+        }
+
+        if (!in_array($paymentType, $this->paymentTypeOptions, true)) {
+            throw new RuntimeException('Forma de pagamento invalida.');
+        }
+
+        return $paymentType;
+    }
+
+    private function detectPaymentsTableReady(): bool
+    {
+        $tableResult = $this->conn->query("SHOW TABLES LIKE 'pagamentos'");
+        if (!$tableResult || !$tableResult->fetch_row()) {
+            return false;
+        }
+
+        $required = ['pedido_id', 'tipo', 'status'];
+        foreach ($required as $column) {
+            $safeColumn = $this->conn->real_escape_string($column);
+            $columnResult = $this->conn->query("SHOW COLUMNS FROM pagamentos LIKE '{$safeColumn}'");
+            if (!$columnResult || !$columnResult->fetch_assoc()) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * @return string[]
+     */
+    private function detectPaymentTypeOptions(): array
+    {
+        try {
+            $tableResult = $this->conn->query("SHOW TABLES LIKE 'pagamentos'");
+            if (!$tableResult || !$tableResult->fetch_row()) {
+                return ['dinheiro', 'cartao', 'pix'];
+            }
+        } catch (Throwable $e) {
+            return ['dinheiro', 'cartao', 'pix'];
+        }
+
+        try {
+            $result = $this->conn->query("SHOW COLUMNS FROM pagamentos LIKE 'tipo'");
+            if (!$result) {
+                return ['dinheiro', 'cartao', 'pix'];
+            }
+        } catch (Throwable $e) {
+            return ['dinheiro', 'cartao', 'pix'];
+        }
+
+        $row = $result->fetch_assoc();
+        if (!$row) {
+            return ['dinheiro', 'cartao', 'pix'];
+        }
+
+        $type = (string) ($row['Type'] ?? $row['type'] ?? '');
+        if ($type === '') {
+            return ['dinheiro', 'cartao', 'pix'];
+        }
+
+        if (preg_match('/^enum\((.*)\)$/i', $type, $matches) !== 1) {
+            return ['dinheiro', 'cartao', 'pix'];
+        }
+
+        $inner = $matches[1];
+        $values = str_getcsv($inner, ',', "'", '\\');
+        $clean = [];
+        foreach ($values as $value) {
+            $v = trim((string) $value);
+            if ($v !== '') {
+                $clean[] = strtolower($v);
+            }
+        }
+
+        if ($clean === []) {
+            return ['dinheiro', 'cartao', 'pix'];
+        }
+
+        return array_values(array_unique($clean));
     }
 }

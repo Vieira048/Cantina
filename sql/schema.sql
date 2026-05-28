@@ -66,6 +66,20 @@ CREATE TABLE IF NOT EXISTS pedido_itens (
     ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS pagamentos (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  pedido_id INT UNSIGNED NOT NULL,
+  tipo ENUM('dinheiro','cartao','pix') NOT NULL,
+  status ENUM('pendente','pago','cancelado') NOT NULL DEFAULT 'pendente',
+  criado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_pagamentos_pedido
+    FOREIGN KEY (pedido_id) REFERENCES pedidos(id)
+    ON UPDATE CASCADE
+    ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE INDEX idx_produtos_categoria ON produtos(categoria);
 CREATE INDEX idx_pedidos_usuario ON pedidos(usuario_id);
 CREATE INDEX idx_pedido_itens_pedido ON pedido_itens(pedido_id);
+CREATE INDEX idx_pagamentos_pedido ON pagamentos(pedido_id);
+CREATE INDEX idx_pagamentos_status ON pagamentos(status);

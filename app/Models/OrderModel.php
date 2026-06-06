@@ -223,6 +223,51 @@ final class OrderModel
         return (bool) ($result && $result->fetch_assoc());
     }
 
+    public function cancelMine(int $userId, int $orderId): bool
+    {
+        if ($userId <= 0 || $orderId <= 0) {
+            return false;
+        }
+
+        if (!in_array('cancelado', $this->orderStatusOptions, true)) {
+            return false;
+        }
+
+        $openStatuses = $this->resolveOpenStatuses();
+        if ($openStatuses === []) {
+            return false;
+        }
+
+        $statusList = $this->quoteStringList($openStatuses);
+        $cancelledStatus = 'cancelado';
+
+        $this->conn->begin_transaction();
+
+        try {
+            $stmt = $this->conn->prepare("UPDATE pedidos SET status = ? WHERE id = ? AND usuario_id = ? AND status IN ($statusList)");
+            $stmt->bind_param('sii', $cancelledStatus, $orderId, $userId);
+            $stmt->execute();
+
+            if ($stmt->affected_rows <= 0) {
+                $this->conn->rollback();
+                return false;
+            }
+
+            if ($this->paymentsTableReady) {
+                $paymentStatus = 'cancelado';
+                $stmtPayment = $this->conn->prepare('UPDATE pagamentos SET status = ? WHERE pedido_id = ?');
+                $stmtPayment->bind_param('si', $paymentStatus, $orderId);
+                $stmtPayment->execute();
+            }
+
+            $this->conn->commit();
+            return true;
+        } catch (Throwable $e) {
+            $this->conn->rollback();
+            return false;
+        }
+    }
+
     public function monthlySalesReport(?string $monthRef = null, int $limit = 10): array
     {
         $limit = max(1, $limit);

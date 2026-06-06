@@ -65,6 +65,14 @@ function loadCart() {
   }
 }
 
+function formatMoneyValue(value) {
+  return Number(value || 0).toFixed(2).replace('.', ',');
+}
+
+function formatMoney(value) {
+  return `R$ ${formatMoneyValue(value)}`;
+}
+
 const produtosEl = document.getElementById('produtos');
 const carrinhoEl = document.getElementById('carrinho');
 const itensCarrinhoEl = document.getElementById('itensCarrinho');
@@ -289,8 +297,8 @@ async function renderProdutos() {
           <p>${escapeHtml(prod.desc || '')}</p>
           <div class="price">${
             prod.isMarmita
-              ? 'A partir de R$ ' + Number(prod.marmitaConfig?.precoP || 0).toFixed(2)
-              : 'R$ ' + Number(prod.price || 0).toFixed(2)
+              ? 'A partir de ' + formatMoney(prod.marmitaConfig?.precoP || 0)
+              : formatMoney(prod.price || 0)
           }</div>
           <div class="buy">
             <button class="btn primary" data-id="${prod.id}" data-marmita="${!!prod.isMarmita}">
@@ -359,7 +367,7 @@ function renderCarrinho() {
           <button class="btn small" data-inc="${idx}" style="padding:2px 7px;">+</button>
         </div>
       </div>
-      <div style="font-weight:700">R$ ${(valor * quantidade).toFixed(2)}</div>
+      <div style="font-weight:700">${formatMoney(valor * quantidade)}</div>
       <button class="btn small" data-remove="${idx}" style="margin-left:5px;">X</button>
     `;
 
@@ -367,7 +375,7 @@ function renderCarrinho() {
     total += valor * quantidade;
   });
 
-  totalEl.textContent = total.toFixed(2);
+  totalEl.textContent = formatMoneyValue(total);
   contadorEl.textContent = String(carrinho.reduce((s, i) => s + Math.max(1, Number(i.quantidade || 1)), 0));
 }
 

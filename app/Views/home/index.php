@@ -136,7 +136,7 @@
     </div>
     <div id="itensCarrinho" class="cart-items"></div>
     <div class="cart-footer">
-      <div class="total">Total: R$ <span id="total">0.00</span></div>
+      <div class="total">Total: R$ <span id="total">0,00</span></div>
       <div class="cart-actions">
         <button id="limparCarrinho" class="btn outline">Limpar</button>
         <button id="finalizar" class="btn primary">Finalizar</button>

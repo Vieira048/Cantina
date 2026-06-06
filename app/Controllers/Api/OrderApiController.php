@@ -36,6 +36,10 @@ final class OrderApiController
                 $this->handleDeliver();
             }
 
+            if (in_array($action, ['cancel', 'cancelar', 'cancelar_pedido'], true)) {
+                $this->handleCancel();
+            }
+
             $this->handleCreateOrder();
         } catch (Throwable $e) {
             JsonResponse::send(500, ['ok' => false, 'message' => 'Erro interno ao processar pedido.']);
@@ -90,6 +94,28 @@ final class OrderApiController
         }
 
         JsonResponse::send(200, ['ok' => true, 'message' => 'Pedido marcado como entregue.']);
+    }
+
+    private function handleCancel(): void
+    {
+        $this->assertLoggedIn();
+        $data = $this->readJsonBody();
+        $orderId = (int) ($data['pedido_id'] ?? $data['id_pedido'] ?? 0);
+
+        if ($orderId <= 0) {
+            JsonResponse::send(422, ['ok' => false, 'message' => 'Pedido invalido.']);
+        }
+
+        $userId = SessionAuth::userId();
+        if ($userId === null) {
+            JsonResponse::send(401, ['ok' => false, 'message' => 'Sessao invalida.']);
+        }
+
+        if (!$this->orders->cancelMine($userId, $orderId)) {
+            JsonResponse::send(409, ['ok' => false, 'message' => 'Pedido nao encontrado ou ja entregue.']);
+        }
+
+        JsonResponse::send(200, ['ok' => true, 'message' => 'Pedido cancelado com sucesso.']);
     }
 
     private function handleCreateOrder(): void

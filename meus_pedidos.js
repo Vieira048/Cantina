@@ -3,6 +3,7 @@ const listaHistoricoEl = document.getElementById('listaHistorico');
 const filtroButtons = Array.from(document.querySelectorAll('[data-filtro]'));
 
 let filtroAtual = 'todos';
+let cancelandoPedidoId = null;
 
 function brl(value) {
   return Number(value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -58,6 +59,11 @@ function formaPagamentoLabel(tipo) {
   return 'Forma de pagamento nao informada';
 }
 
+function podeCancelarPedido(status) {
+  const s = String(status || '').toLowerCase().trim();
+  return s !== 'finalizado' && s !== 'entregue' && s !== 'cancelado';
+}
+
 function configItemHtml(config) {
   if (!config || typeof config !== 'object') {
     return '';
@@ -105,12 +111,14 @@ function cardPedidoHtml(order) {
   const pagamentoStatus = statusPagamentoInfo(order.pagamento?.status);
   const pagamentoTipo = formaPagamentoLabel(order.pagamento?.tipo);
   const itens = Array.isArray(order.itens) ? order.itens : [];
+  const id = Number(order.id || 0);
+  const cancelando = cancelandoPedidoId === id;
 
   return `
     <article class="card-pedido">
       <div class="pedido-cabecalho">
         <div>
-          <div class="pedido-id">Pedido #${Number(order.id || 0)}</div>
+          <div class="pedido-id">Pedido #${id}</div>
           <div class="pedido-meta">Data e horario: ${escapeHtml(formatDateTime(order.criado_em))}</div>
           <div class="pedido-meta">Forma de pagamento: ${escapeHtml(pagamentoTipo)}</div>
         </div>
@@ -123,6 +131,13 @@ function cardPedidoHtml(order) {
         ${itens.map(itemPedidoHtml).join('')}
       </ul>
       <div class="total">Total do pedido: ${brl(order.valor_total || 0)}</div>
+      ${podeCancelarPedido(order.status) ? `
+        <div class="pedido-actions">
+          <button class="btn btn-cancelar" type="button" data-cancelar-pedido="${id}" ${cancelando ? 'disabled' : ''}>
+            ${cancelando ? 'Cancelando...' : 'Cancelar pedido'}
+          </button>
+        </div>
+      ` : ''}
     </article>
   `;
 }
@@ -162,6 +177,30 @@ async function loadMeusPedidos(filtro) {
   return payload.data || { pedidos_atuais: [], historico: [] };
 }
 
+async function cancelarPedido(pedidoId) {
+  const res = await fetch('api/pedidos.php?action=cancelar', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ pedido_id: pedidoId }),
+  });
+
+  let payload = {};
+  try {
+    payload = await res.json();
+  } catch (_err) {
+    payload = {};
+  }
+
+  if (res.status === 401) {
+    window.location.href = 'login.php?erro=login&next=' + encodeURIComponent('meus_pedidos.php');
+    return;
+  }
+
+  if (!res.ok || !payload.ok) {
+    throw new Error(payload.message || 'Nao foi possivel cancelar o pedido.');
+  }
+}
+
 function setFiltroAtivo(valor) {
   filtroAtual = valor;
   filtroButtons.forEach((button) => {
@@ -195,6 +234,39 @@ filtroButtons.forEach((button) => {
     setFiltroAtivo(filtro);
     refresh();
   });
+});
+
+document.addEventListener('click', async (event) => {
+  const button = event.target.closest('[data-cancelar-pedido]');
+  if (!button) {
+    return;
+  }
+
+  const pedidoId = Number(button.dataset.cancelarPedido || 0);
+  if (!Number.isInteger(pedidoId) || pedidoId <= 0 || cancelandoPedidoId !== null) {
+    return;
+  }
+
+  if (!window.confirm('Cancelar este pedido?')) {
+    return;
+  }
+
+  cancelandoPedidoId = pedidoId;
+  button.disabled = true;
+  button.textContent = 'Cancelando...';
+
+  try {
+    await cancelarPedido(pedidoId);
+    await refresh();
+  } catch (err) {
+    alert(err.message || 'Nao foi possivel cancelar o pedido.');
+  } finally {
+    cancelandoPedidoId = null;
+    if (document.body.contains(button)) {
+      button.disabled = false;
+      button.textContent = 'Cancelar pedido';
+    }
+  }
 });
 
 setFiltroAtivo('todos');

@@ -291,6 +291,22 @@
       color: #23140d;
     }
 
+    .pedido-actions {
+      margin-top: 10px;
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    .btn-cancelar {
+      background: #8f2f2f;
+      color: #fff;
+    }
+
+    .btn-cancelar:disabled {
+      opacity: 0.7;
+      cursor: wait;
+    }
+
     .vazio {
       background: var(--card);
       border-radius: 12px;
@@ -370,6 +386,6 @@
     </section>
   </main>
 
-  <script src="meus_pedidos.js"></script>
+  <script src="meus_pedidos.js?v=2"></script>
 </body>
 </html>

@@ -73,12 +73,16 @@ const formMarmita = document.getElementById('formMarmita');
 
 let marmita = null;
 
+function formatMoney(value) {
+  return `R$ ${Number(value || 0).toFixed(2).replace('.', ',')}`;
+}
+
 function renderTamanhos() {
   const cfg = marmita.marmitaConfig || {};
   marmitaTamanho.innerHTML = `
-    <option value="P">Pequena - R$ ${Number(cfg.precoP || 0).toFixed(2)}</option>
-    <option value="M">Media - R$ ${Number(cfg.precoM || 0).toFixed(2)}</option>
-    <option value="G">Grande - R$ ${Number(cfg.precoG || 0).toFixed(2)}</option>
+    <option value="P">Pequena - ${formatMoney(cfg.precoP || 0)}</option>
+    <option value="M">Media - ${formatMoney(cfg.precoM || 0)}</option>
+    <option value="G">Grande - ${formatMoney(cfg.precoG || 0)}</option>
   `;
 }
 
@@ -130,7 +134,7 @@ function calcularValor(tamanho) {
 
 function atualizarValor() {
   const valor = calcularValor(marmitaTamanho.value);
-  marmitaValor.textContent = `Valor: R$ ${valor.toFixed(2)}`;
+  marmitaValor.textContent = `Valor: ${formatMoney(valor)}`;
 }
 
 if (marmitaTamanho) {

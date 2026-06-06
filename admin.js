@@ -19,6 +19,10 @@ async function apiListProducts() {
   }));
 }
 
+function formatMoneyValue(value) {
+  return Number(value || 0).toFixed(2).replace('.', ',');
+}
+
 async function apiSaveProduct(produto) {
   const res = await fetch('api/produtos.php', {
     method: 'POST',
@@ -334,7 +338,7 @@ function renderListaProdutos() {
     <img src="${p.image || 'https://via.placeholder.com/120x90'}" alt="${escapeHtml(p.name)}" style="max-width:80px;max-height:80px;object-fit:cover;border-radius:6px;" />
     <div>
       <div style="font-weight:700">${escapeHtml(p.name)}</div>
-      <div style="font-size:13px;color:#666">${escapeHtml(p.category)} - R$ ${Number(p.price || 0).toFixed(2)}</div>
+      <div style="font-size:13px;color:#666">${escapeHtml(p.category)} - R$ ${formatMoneyValue(p.price || 0)}</div>
     </div>
   </div>
   <div>

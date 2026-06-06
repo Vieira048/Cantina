@@ -91,6 +91,7 @@ const menuOverlayEl = document.getElementById('menuOverlay');
 
 let produtos = [];
 let carrinho = [];
+let categoryScrollSpyFrame = 0;
 
 function normalizeText(value) {
   return String(value ?? '')
@@ -154,9 +155,12 @@ function renderCategoryMenu(categoryEntries) {
 
   menuCategoriasListaEl.innerHTML = entries.map((entry) => `
     <a href="#${entry.id}" class="menu-item menu-item-link" data-menu-target="${entry.id}">
-      ${escapeHtml(entry.label)}
+      <span>${escapeHtml(entry.label)}</span>
     </a>
   `).join('');
+
+  setActiveCategoryMenuItem(window.location.hash.replace('#', ''));
+  requestCategoryMenuActiveSync();
 }
 
 function setOverlayVisible(visible) {
@@ -235,6 +239,64 @@ function toggleUsuarioMenu() {
 function closeAllFloatingMenus() {
   closeCategoriasMenu();
   closeUsuarioMenu();
+}
+
+function setActiveCategoryMenuItem(targetId) {
+  if (!menuCategoriasListaEl) return;
+
+  menuCategoriasListaEl.querySelectorAll('[data-menu-target]').forEach((item) => {
+    const isActive = item.getAttribute('data-menu-target') === targetId;
+    item.classList.toggle('is-active', isActive);
+
+    if (isActive) {
+      item.setAttribute('aria-current', 'true');
+    } else {
+      item.removeAttribute('aria-current');
+    }
+  });
+}
+
+function getCategorySpyOffset() {
+  const topbar = document.querySelector('.topbar');
+  return (topbar ? topbar.offsetHeight : 76) + 24;
+}
+
+function findCurrentCategorySectionId() {
+  if (!menuCategoriasListaEl) return '';
+
+  const menuTargets = new Set(
+    Array.from(menuCategoriasListaEl.querySelectorAll('[data-menu-target]'))
+      .map((item) => item.getAttribute('data-menu-target'))
+      .filter(Boolean)
+  );
+  const sections = Array.from(document.querySelectorAll('.catalog-section[id]'))
+    .filter((section) => menuTargets.has(section.id));
+
+  if (sections.length === 0) return '';
+
+  const offset = getCategorySpyOffset();
+  let activeId = '';
+
+  sections.forEach((section) => {
+    if (section.getBoundingClientRect().top <= offset) {
+      activeId = section.id;
+    }
+  });
+
+  return activeId;
+}
+
+function syncCategoryMenuActiveFromScroll() {
+  setActiveCategoryMenuItem(findCurrentCategorySectionId());
+}
+
+function requestCategoryMenuActiveSync() {
+  if (categoryScrollSpyFrame) return;
+
+  categoryScrollSpyFrame = window.requestAnimationFrame(() => {
+    categoryScrollSpyFrame = 0;
+    syncCategoryMenuActiveFromScroll();
+  });
 }
 
 function scrollToCategorySection(targetId) {
@@ -464,9 +526,14 @@ if (menuCategoriasListaEl) {
     if (!targetId) return;
 
     scrollToCategorySection(targetId);
+    setActiveCategoryMenuItem(targetId);
     closeCategoriasMenu();
   });
 }
+
+window.addEventListener('scroll', requestCategoryMenuActiveSync, { passive: true });
+window.addEventListener('resize', requestCategoryMenuActiveSync);
+window.addEventListener('load', requestCategoryMenuActiveSync);
 
 document.addEventListener('click', (event) => {
   const target = event.target;

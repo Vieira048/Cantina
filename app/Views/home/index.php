@@ -5,7 +5,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Cantina - Home</title>
-  <link rel="stylesheet" href="style.css?v=menus_flutuantes_20260527_3" />
+  <link rel="stylesheet" href="style.css?v=menu_categorias_linha_20260606_5" />
   <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
 </head>
 
@@ -69,12 +69,12 @@
 
   <aside id="menuCategorias" class="floating-menu left-menu" aria-hidden="true" hidden>
     <div class="floating-menu-header">
-      <h2>Categorias</h2>
+      <h2>Categoria</h2>
     </div>
     <nav id="menuCategoriasLista" class="floating-menu-list">
-      <a href="#salgados" class="menu-item menu-item-link" data-menu-target="salgados">Salgados</a>
-      <a href="#marmitas" class="menu-item menu-item-link" data-menu-target="marmitas">Marmitas</a>
-      <a href="#bebidas" class="menu-item menu-item-link" data-menu-target="bebidas">Bebidas</a>
+      <a href="#salgados" class="menu-item menu-item-link" data-menu-target="salgados"><span>Salgados</span></a>
+      <a href="#marmitas" class="menu-item menu-item-link" data-menu-target="marmitas"><span>Marmitas</span></a>
+      <a href="#bebidas" class="menu-item menu-item-link" data-menu-target="bebidas"><span>Bebidas</span></a>
     </nav>
   </aside>
 
@@ -144,7 +144,7 @@
     </div>
   </aside>
 
-  <script src="script.js?v=menus_flutuantes_20260527_3"></script>
+  <script src="script.js?v=menu_categorias_linha_20260606_5"></script>
 </body>
 
 <footer class="footer">

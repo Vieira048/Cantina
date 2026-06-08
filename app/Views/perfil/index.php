@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Perfil do Usuário - Cantina</title>
   <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
-  <link rel="stylesheet" href="perfil.css?v=perfil_20260527_1" />
+  <link rel="stylesheet" href="perfil.css" />
 </head>
 <body>
   <?php
@@ -28,14 +28,6 @@
     }
 
   ?>
-
-  <header class="perfil-topo">
-    <div class="perfil-topo-logo">CANTINA</div>
-    <div class="perfil-topo-acoes">
-      <a href="index.php" class="chip-topo">Inicio</a>
-      <a href="meus_pedidos.php" class="chip-topo">Pedidos</a>
-    </div>
-  </header>
 
   <div class="perfil-layout">
     <aside class="perfil-lateral">
@@ -216,6 +208,6 @@
     </main>
   </div>
 
-  <script src="perfil.js?v=perfil_20260527_1"></script>
+  <script src="perfil.js"></script>
 </body>
 </html>

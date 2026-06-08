@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&display=swap');
+
 :root {
   --bg: #8C6E54;
   --card: #BFA288;
@@ -8,9 +10,6 @@
   --soft-shadow: rgba(0, 0, 0, 0.35);
   --highlight: #402B1F;
 }
-
-@import url('https://fonts.googleapis.com/css2?family=Playwrite+DE+SAS:wght@100..400&family=Playwrite+ZA:wght@100..400&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Merriweather:ital,opsz,wght@0,18..144,300..900;1,18..144,300..900&display=swap');
 
 * {
   margin: 0;
@@ -23,13 +22,20 @@ html {
 }
 
 body {
-  font-family: "Merriweather", serif;
+  font-family: "Sora", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   background: var(--bg);
   color: var(--text);
   background-image: radial-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px);
   background-size: 24px 24px;
-  font-size: 30px;
-    line-height: 1.6;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
 }
 
 
@@ -200,8 +206,8 @@ body {
 }
 
 .user-chip-name {
-  font-size: 0.74rem;
-  font-weight: 700;
+  font-size: 0.95rem;
+  font-weight: 600;
   color: #3f281b;
   white-space: nowrap;
   overflow: hidden;
@@ -209,7 +215,8 @@ body {
 }
 
 .user-chip-email {
-  font-size: 0.56rem;
+  font-size: 0.8rem;
+  font-weight: 400;
   color: #6d4a36;
   white-space: nowrap;
   overflow: hidden;
@@ -309,7 +316,7 @@ body {
 }
 
 .user-menu-email {
-  font-size: 0.66rem;
+  font-size: 0.8rem;
   color: #f6d8be;
   white-space: nowrap;
   overflow: hidden;
@@ -371,8 +378,8 @@ body {
   max-width: 100%;
   text-decoration: none;
   color: #402B1F;
-  font-size: 0.92rem;
-  font-weight: 700;
+  font-size: 1rem;
+  font-weight: 500;
   padding: 8px 2px;
   cursor: pointer;
 }
@@ -422,7 +429,7 @@ body {
 .left-menu .floating-menu-header h2 {
   color: var(--accent-light);
   font-size: 1.65rem;
-  font-weight: 800;
+  font-weight: 700;
   line-height: 1.05;
   text-align: center;
 }
@@ -439,7 +446,7 @@ body {
   width: 100%;
   padding: 9px 12px;
   color: var(--accent-light);
-  font-size: 1.05rem;
+  font-size: 1rem;
   font-weight: 500;
   line-height: 1.2;
   text-align: center;
@@ -474,15 +481,7 @@ body {
 }
 
 .left-menu .menu-item span::after {
-  content: '';
-  position: absolute;
-  left: 50%;
-  bottom: 0;
-  width: var(--category-text-line-width);
-  height: 2px;
-  background: currentColor;
-  transform: translateX(-50%);
-  transition: background-color 260ms cubic-bezier(.2, .8, .2, 1);
+  display: none;
 }
 
 .left-menu .menu-item:hover,
@@ -520,7 +519,7 @@ body {
 }
 
 .user-email {
-  font-size: 0.78rem;
+  font-size: 0.8rem;
   color: #4e3829;
   word-break: break-word;
 }
@@ -537,7 +536,7 @@ body {
   cursor: pointer;
   transition: all 0.25s ease;
   font-weight: 600;
-  font-size: 14px;
+  font-size: 1rem;
   background: #BFA288;
   color: #402B1F;
 }
@@ -635,21 +634,23 @@ body {
 }
 
 .card-item h4 {
-  font-family: "Merriweather", serif;
-  font-size: 16px;
+  font-size: 1.2rem;
+  font-weight: 600;
   color: var(--highlight);
   margin-bottom: 6px;
 }
 
 .card-item p {
-  font-family: "Merriweather", serif;
   color: var(--muted);
-  font-size: 14px;
+  font-size: 0.95rem;
+  font-weight: 400;
+  line-height: 1.5;
   margin-bottom: 12px;
 }
 
 .card-item .price {
   margin-top: auto;
+  font-size: 1.3rem;
   font-weight: 700;
   color: var(--text);
 }
@@ -801,7 +802,42 @@ body {
   .right-menu.open {
     transform: translateY(0);
   }
-  .card-item { width: 100%; }
+  .cards {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
+    gap: 14px;
+    padding: 2px 4px 14px;
+    margin-inline: -4px;
+    cursor: grab;
+  }
+  .cards:active,
+  .cards.is-dragging {
+    cursor: grabbing;
+  }
+  .cards.is-dragging {
+    scroll-snap-type: none;
+  }
+  .cards::-webkit-scrollbar {
+    height: 8px;
+  }
+  .cards::-webkit-scrollbar-track {
+    background: rgba(64, 43, 31, 0.12);
+    border-radius: 999px;
+  }
+  .cards::-webkit-scrollbar-thumb {
+    background: rgba(64, 43, 31, 0.55);
+    border-radius: 999px;
+  }
+  .card-item {
+    width: auto;
+    flex: 0 0 min(84vw, 320px);
+    scroll-snap-align: start;
+  }
   .cart { width: 90%; right: 5%; }
 }
 
@@ -836,7 +872,7 @@ body {
   font-size: 1.2rem;
   margin-bottom: 1rem;
   position: relative;
-  font-family: "Merriweather", serif;
+  font-weight: 600;
 }
 
 .footer-section h3::after {
@@ -966,9 +1002,9 @@ body {
   margin: 0;
   z-index: 2;                 
   color: #BFA288;
-  font-family: "Merriweather", serif;
-  font-size: 3rem;
-  font-weight: 800;
+  font-size: 4rem;
+  font-weight: 700;
+  line-height: 1.1;
   text-shadow: 0 6px 20px rgba(0,0,0,0.7);
   white-space: nowrap;
 }
@@ -980,20 +1016,22 @@ body {
   top: calc(50% + 64px);
   z-index: 2;
   color: #BFA288;
-  font-size: 0.95rem;
+  font-size: 1.2rem;
+  font-weight: 400;
 }
 
 
 @media (max-width: 900px) {
   .window-inner { height: 220px; }
-  .window-inner h1 { font-size: 2.4rem; left: 28px; }
+  .window-inner h1 { font-size: 3rem; left: 28px; }
   .window-inner .subtitle { left: 28px; top: calc(50% + 46px); }
 }
 
 @media (max-width: 480px) {
   .window { max-width: 92%; padding: 8px; border-radius: 14px; }
   .window-inner { height: 160px; border-radius: 10px; }
-  .window-inner h1 { font-size: 1.6rem; left: 16px; top: 45%; white-space: normal; }
+  .window-inner h1 { font-size: 2.2rem; left: 16px; top: 45%; white-space: normal; }
+  .window-inner .subtitle { font-size: 1rem; left: 16px; top: calc(50% + 34px); }
 }
 
 
@@ -1001,10 +1039,10 @@ body {
 .section-title{
   
   text-align: center;
-  font-size: 1.8rem;
-  font-weight: 700;
+  font-size: 2.5rem;
+  font-weight: 600;
   color: #52453a;
-  letter-spacing: 1px;
+  letter-spacing: 2px;
   text-transform: uppercase;
   padding: 6px 14px;
   border-radius: 5px;
@@ -1013,6 +1051,46 @@ body {
   margin-bottom: 20px;
   margin-top: 20px;
 
+}
+
+@media (max-width: 1440px) {
+  .window-inner h1 {
+    font-size: 3rem;
+  }
+
+  .section-title {
+    font-size: 2rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .window-inner h1 {
+    font-size: 2.2rem;
+  }
+
+  .window-inner .subtitle {
+    font-size: 1rem;
+  }
+
+  .section-title {
+    font-size: 1.8rem;
+  }
+
+  .card-item h4 {
+    font-size: 1rem;
+  }
+
+  .card-item p {
+    font-size: 0.9rem;
+  }
+
+  .card-item .price {
+    font-size: 1.1rem;
+  }
+
+  .btn {
+    font-size: 0.95rem;
+  }
 }
 
 

@@ -2,6 +2,8 @@
 const ordersStatusEl = document.getElementById('ordersStatus');
 const reportBarsEl = document.getElementById('reportBars');
 const reportMonthEl = document.getElementById('reportMonth');
+const monthlyRevenueBarsEl = document.getElementById('monthlyRevenueBars');
+const draggableMobileLists = [ordersListEl, reportBarsEl, monthlyRevenueBarsEl].filter(Boolean);
 
 function currentMonthRef() {
   const now = new Date();
@@ -11,6 +13,14 @@ function currentMonthRef() {
 
 function brl(value) {
   return Number(value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+function monthLabel(monthRef) {
+  const [year, month] = String(monthRef || '').split('-').map(Number);
+  if (!year || !month) return String(monthRef || 'Mes');
+
+  const date = new Date(year, month - 1, 1);
+  return date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
 }
 
 function escapeHtml(value) {
@@ -104,13 +114,19 @@ function buildItemConfigHtml(configuration) {
 
   const lines = [];
   const tamanho = String(configuration.tamanho || '').trim();
-  const carbo = String(configuration.carbo || '').trim();
+  const carbos = Array.isArray(configuration.carbos) && configuration.carbos.length > 0
+    ? configuration.carbos
+    : (configuration.carbo ? [String(configuration.carbo)] : []);
   const proteinas = Array.isArray(configuration.proteinas) ? configuration.proteinas : [];
   const saladas = Array.isArray(configuration.saladas) ? configuration.saladas : [];
   const adicionais = Array.isArray(configuration.adicionais) ? configuration.adicionais : [];
+  const valorBase = Number(configuration.valor_base || 0);
+  const valorExtras = Number(configuration.valor_extras || 0);
 
   if (tamanho !== '') lines.push(`<div><b>Tamanho:</b> ${escapeHtml(tamanho)}</div>`);
-  if (carbo !== '') lines.push(`<div><b>Carbo:</b> ${escapeHtml(carbo)}</div>`);
+  if (valorBase > 0) lines.push(`<div><b>Valor base:</b> ${escapeHtml(brl(valorBase))}</div>`);
+  if (valorExtras > 0) lines.push(`<div><b>Adicionais:</b> ${escapeHtml(brl(valorExtras))}</div>`);
+  if (carbos.length > 0) lines.push(`<div><b>Carbo:</b> ${carbos.map(escapeHtml).join(', ')}</div>`);
   if (proteinas.length > 0) lines.push(`<div><b>Proteinas:</b> ${proteinas.map(escapeHtml).join(', ')}</div>`);
   if (saladas.length > 0) lines.push(`<div><b>Saladas:</b> ${saladas.map(escapeHtml).join(', ')}</div>`);
   if (adicionais.length > 0) lines.push(`<div><b>Adicionais:</b> ${adicionais.map(escapeHtml).join(', ')}</div>`);
@@ -203,20 +219,91 @@ function renderReport(report) {
   });
 }
 
+function renderMonthlyRevenueReport(months) {
+  if (!monthlyRevenueBarsEl) return;
+
+  monthlyRevenueBarsEl.innerHTML = '';
+
+  if (!Array.isArray(months) || months.length === 0) {
+    monthlyRevenueBarsEl.innerHTML = '<p class="empty-state">Ainda nao ha vendas finalizadas para comparar por mes.</p>';
+    return;
+  }
+
+  const maxRevenue = months.reduce((max, month) => Math.max(max, Number(month.faturamento || 0)), 0) || 1;
+
+  months.forEach((month) => {
+    const revenue = Number(month.faturamento || 0);
+    const width = Math.max(5, Math.round((revenue / maxRevenue) * 100));
+    const orders = Number(month.total_pedidos || 0);
+    const row = document.createElement('div');
+    row.className = 'monthly-total';
+    row.innerHTML = `
+      <div class="bar-label">${escapeHtml(monthLabel(month.mes))}</div>
+      <div class="bar-wrap" title="${orders} pedido(s)">
+        <div class="bar-fill" style="width:${width}%"></div>
+      </div>
+      <div class="monthly-value">${escapeHtml(brl(revenue))}</div>
+    `;
+    monthlyRevenueBarsEl.appendChild(row);
+  });
+}
+
+function enableDragScroll(container) {
+  let isDown = false;
+  let startX = 0;
+  let startScrollLeft = 0;
+
+  container.addEventListener('pointerdown', (event) => {
+    if (!window.matchMedia('(max-width: 640px)').matches) return;
+    if (event.pointerType === 'touch') return;
+
+    isDown = true;
+    startX = event.clientX;
+    startScrollLeft = container.scrollLeft;
+    container.setPointerCapture(event.pointerId);
+  });
+
+  container.addEventListener('pointermove', (event) => {
+    if (!isDown) return;
+    event.preventDefault();
+    container.scrollLeft = startScrollLeft - (event.clientX - startX);
+  });
+
+  const stopDrag = (event) => {
+    if (!isDown) return;
+    isDown = false;
+    if (container.hasPointerCapture(event.pointerId)) {
+      container.releasePointerCapture(event.pointerId);
+    }
+  };
+
+  container.addEventListener('pointerup', stopDrag);
+  container.addEventListener('pointercancel', stopDrag);
+  container.addEventListener('pointerleave', stopDrag);
+}
+
+draggableMobileLists.forEach(enableDragScroll);
+
 async function refreshDashboard() {
   const monthRef = (reportMonthEl.value || currentMonthRef()).trim();
   ordersStatusEl.textContent = 'Carregando pedidos...';
   reportBarsEl.innerHTML = '<p class="empty-state">Carregando relatorio...</p>';
+  if (monthlyRevenueBarsEl) {
+    monthlyRevenueBarsEl.innerHTML = '<p class="empty-state">Carregando valores mensais...</p>';
+  }
 
   try {
     const data = await loadDashboard(monthRef);
     renderOrders(data.pedidos || []);
     renderReport(data.relatorio || { items: [] });
+    renderMonthlyRevenueReport(data.faturamento_mensal || []);
   } catch (err) {
-    console.error(err);
     ordersStatusEl.textContent = err.message || 'Falha ao carregar dados.';
     ordersListEl.innerHTML = '<p class="empty-state">Erro ao listar pedidos.</p>';
     reportBarsEl.innerHTML = '<p class="empty-state">Erro ao carregar relatorio.</p>';
+    if (monthlyRevenueBarsEl) {
+      monthlyRevenueBarsEl.innerHTML = '<p class="empty-state">Erro ao carregar valores mensais.</p>';
+    }
   }
 }
 
@@ -235,7 +322,6 @@ document.addEventListener('click', async (event) => {
     await sendDelivered(orderId);
     await refreshDashboard();
   } catch (err) {
-    console.error(err);
     alert(err.message || 'Nao foi possivel marcar o pedido como entregue.');
     button.disabled = false;
     button.textContent = oldText;

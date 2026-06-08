@@ -6,7 +6,7 @@
   <title>Meus Pedidos - Cantina</title>
   <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Merriweather:wght@300;400;700;900&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&display=swap');
 
     :root {
       --bg: #8c6e54;
@@ -23,7 +23,7 @@
     body {
       margin: 0;
       min-height: 100vh;
-      font-family: "Merriweather", serif;
+      font-family: "Sora", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       background: var(--bg);
       color: var(--text);
     }
@@ -44,7 +44,7 @@
     .topbar h1 {
       margin: 0;
       font-size: 1.5rem;
-      font-weight: 900;
+      font-weight: 700;
     }
 
     .topbar nav {
@@ -118,8 +118,8 @@
     }
 
     .perfil-mini-nome {
-      font-size: 0.78rem;
-      font-weight: 700;
+      font-size: 0.95rem;
+      font-weight: 600;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -127,7 +127,8 @@
     }
 
     .perfil-mini-email {
-      font-size: 0.66rem;
+      font-size: 0.8rem;
+      font-weight: 400;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -210,7 +211,7 @@
 
     .pedido-id {
       font-size: 1.03rem;
-      font-weight: 900;
+      font-weight: 700;
     }
 
     .pedido-meta {
@@ -232,7 +233,7 @@
       display: inline-block;
       border-radius: 999px;
       padding: 4px 8px;
-      font-size: 0.74rem;
+      font-size: 0.85rem;
       font-weight: 700;
       color: #fff;
     }
@@ -272,20 +273,20 @@
     }
 
     .item-desc {
-      font-size: 0.78rem;
+      font-size: 0.85rem;
       color: #4a2d1f;
       margin-bottom: 4px;
       line-height: 1.3;
     }
 
     .item-config {
-      font-size: 0.78rem;
+      font-size: 0.85rem;
       color: #3f271b;
     }
 
     .total {
       margin-top: 8px;
-      font-weight: 900;
+      font-weight: 700;
       text-align: right;
       font-size: 0.95rem;
       color: #23140d;
@@ -331,6 +332,7 @@
       }
     }
   </style>
+  <link rel="stylesheet" href="topbar.css" />
 </head>
 <body>
   <?php
@@ -342,9 +344,14 @@
     $fotoExibicao = trim((string) ($fotoUsuario ?? ''));
     $temFoto = $fotoExibicao !== '';
   ?>
-  <header class="topbar">
-    <h1>Meus Pedidos</h1>
-    <nav>
+  <header class="topbar site-topbar">
+    <a class="site-topbar-brand" href="index.php" aria-label="Inicio">
+      <picture class="site-topbar-logo-wrap">
+        <source media="(max-width: 640px)" srcset="imagens/logo-mobile.png">
+        <img class="site-topbar-logo" src="imagens/logo-topbar.png" alt="Sabores Tecnicos - Cantina Online">
+      </picture>
+    </a>
+    <nav class="site-topbar-actions">
       <div class="perfil-mini">
         <span class="perfil-mini-avatar <?php echo $temFoto ? 'has-photo' : ''; ?>" aria-hidden="true">
           <?php if ($temFoto): ?>
@@ -358,9 +365,9 @@
           <?php endif; ?>
         </span>
       </div>
-      <a class="btn" href="index.php">Ver produtos</a>
-      <a class="btn" href="perfil.php">Perfil</a>
-      <a class="btn" href="deslogar.php">Deslogar</a>
+      <a class="btn site-topbar-btn" href="index.php">Ver produtos</a>
+      <a class="btn site-topbar-btn" href="perfil.php">Perfil</a>
+      <a class="btn site-topbar-btn" href="deslogar.php">Deslogar</a>
     </nav>
   </header>
 
@@ -386,6 +393,6 @@
     </section>
   </main>
 
-  <script src="meus_pedidos.js?v=2"></script>
+  <script src="meus_pedidos.js"></script>
 </body>
 </html>

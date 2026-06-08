@@ -72,6 +72,7 @@ final class OrderApiController
                 'data' => [
                     'pedidos' => $this->orders->listOpenWithItems(100),
                     'relatorio' => $this->orders->monthlySalesReport($month !== '' ? $month : null, 12),
+                    'faturamento_mensal' => $this->orders->monthlyRevenueReport(12),
                 ],
             ]);
         }

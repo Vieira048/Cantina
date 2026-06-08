@@ -71,13 +71,19 @@ function configItemHtml(config) {
 
   const partes = [];
   const tamanho = String(config.tamanho || '').trim();
-  const carbo = String(config.carbo || '').trim();
+  const carbos = Array.isArray(config.carbos) && config.carbos.length > 0
+    ? config.carbos
+    : (config.carbo ? [String(config.carbo)] : []);
   const proteinas = Array.isArray(config.proteinas) ? config.proteinas : [];
   const saladas = Array.isArray(config.saladas) ? config.saladas : [];
   const adicionais = Array.isArray(config.adicionais) ? config.adicionais : [];
+  const valorBase = Number(config.valor_base || 0);
+  const valorExtras = Number(config.valor_extras || 0);
 
   if (tamanho !== '') partes.push(`<div><b>Tamanho:</b> ${escapeHtml(tamanho)}</div>`);
-  if (carbo !== '') partes.push(`<div><b>Carbo:</b> ${escapeHtml(carbo)}</div>`);
+  if (valorBase > 0) partes.push(`<div><b>Valor base:</b> ${escapeHtml(brl(valorBase))}</div>`);
+  if (valorExtras > 0) partes.push(`<div><b>Adicionais:</b> ${escapeHtml(brl(valorExtras))}</div>`);
+  if (carbos.length > 0) partes.push(`<div><b>Carbo:</b> ${carbos.map(escapeHtml).join(', ')}</div>`);
   if (proteinas.length > 0) partes.push(`<div><b>Proteinas:</b> ${proteinas.map(escapeHtml).join(', ')}</div>`);
   if (saladas.length > 0) partes.push(`<div><b>Saladas:</b> ${saladas.map(escapeHtml).join(', ')}</div>`);
   if (adicionais.length > 0) partes.push(`<div><b>Adicionais:</b> ${adicionais.map(escapeHtml).join(', ')}</div>`);

@@ -316,6 +316,43 @@ final class OrderModel
         ];
     }
 
+    public function monthlyRevenueReport(int $limit = 12): array
+    {
+        $limit = max(1, $limit);
+        $deliveredStatuses = $this->resolveDeliveredStatusesForReport();
+        if ($deliveredStatuses === []) {
+            return [];
+        }
+
+        $column = $this->orderCreatedAtColumn;
+        $statusList = $this->quoteStringList($deliveredStatuses);
+
+        $sql = "SELECT DATE_FORMAT(p.$column, '%Y-%m') AS mes,
+                       COUNT(*) AS total_pedidos,
+                       SUM(p.valor_total) AS faturamento
+                FROM pedidos p
+                WHERE p.status IN ($statusList)
+                GROUP BY DATE_FORMAT(p.$column, '%Y-%m')
+                ORDER BY mes DESC
+                LIMIT ?";
+
+        $stmt = $this->conn->prepare($sql);
+        $stmt->bind_param('i', $limit);
+        $stmt->execute();
+
+        $result = $stmt->get_result();
+        $months = [];
+        while ($row = $result->fetch_assoc()) {
+            $months[] = [
+                'mes' => (string) ($row['mes'] ?? ''),
+                'total_pedidos' => (int) ($row['total_pedidos'] ?? 0),
+                'faturamento' => (float) ($row['faturamento'] ?? 0),
+            ];
+        }
+
+        return array_reverse($months);
+    }
+
     public function createFromItems(int $usuarioId, array $items, ?string $paymentType = null): array
     {
         if (!$this->paymentsTableReady) {

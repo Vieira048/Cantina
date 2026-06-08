@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Merriweather:wght@300;400;700;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&display=swap');
 
 :root {
   --fundo: #cfb095;
@@ -25,7 +25,7 @@ html {
 body {
   margin: 0;
   min-height: 100vh;
-  font-family: "Merriweather", serif;
+  font-family: "Sora", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color: var(--texto);
   background:
     radial-gradient(circle at 12% 10%, rgba(255, 255, 255, 0.22), transparent 48%),
@@ -48,7 +48,7 @@ body {
 
 .perfil-topo-logo {
   font-size: 2rem;
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: 1px;
   color: #f5e8dc;
 }
@@ -86,7 +86,7 @@ body {
 
 .perfil-lateral {
   position: sticky;
-  top: 98px;
+  top: 18px;
   align-self: start;
   background: linear-gradient(180deg, rgba(45, 27, 17, 0.96), rgba(68, 42, 27, 0.94));
   border-radius: 22px;
@@ -350,7 +350,7 @@ body {
   color: #41281c;
   border-radius: 999px;
   padding: 6px 10px;
-  font-size: 0.76rem;
+  font-size: 0.8rem;
   font-weight: 700;
 }
 
@@ -471,7 +471,7 @@ body {
 
   .chip-topo {
     padding: 7px 10px;
-    font-size: 0.75rem;
+    font-size: 0.8rem;
   }
 
   .perfil-layout {

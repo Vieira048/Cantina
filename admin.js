@@ -77,6 +77,133 @@ let marmitaProteinas = [];
 let marmitaSaladas = [];
 let marmitaAdicionais = [];
 
+const MARMITA_CATEGORIES = {
+  carbo: {
+    legacyKey: 'carbos',
+    listId: 'marmitaListaCarbos',
+    nameId: 'marmitaCategoriaCarboNome',
+    includedId: 'marmitaCarboInclusos',
+    extraId: 'marmitaCarboValorExtra',
+    defaultName: 'Carboidrato',
+    defaultIncluded: 1,
+    defaultExtra: 3,
+    required: true,
+  },
+  proteinas: {
+    legacyKey: 'proteinas',
+    listId: 'marmitaListaProteinas',
+    nameId: 'marmitaCategoriaProteinasNome',
+    includedId: 'marmitaProteinasInclusos',
+    extraId: 'marmitaProteinasValorExtra',
+    defaultName: 'Proteinas',
+    defaultIncluded: 1,
+    defaultExtra: 5,
+    required: true,
+  },
+  saladas: {
+    legacyKey: 'saladas',
+    listId: 'marmitaListaSaladas',
+    nameId: 'marmitaCategoriaSaladasNome',
+    includedId: 'marmitaSaladasInclusos',
+    extraId: 'marmitaSaladasValorExtra',
+    defaultName: 'Saladas',
+    defaultIncluded: 1,
+    defaultExtra: 2,
+    required: true,
+  },
+  adicionais: {
+    legacyKey: 'adicionais',
+    listId: 'marmitaListaAdicionais',
+    nameId: 'marmitaCategoriaAdicionaisNome',
+    includedId: 'marmitaAdicionaisInclusos',
+    extraId: 'marmitaAdicionaisValorExtra',
+    defaultName: 'Adicionais',
+    defaultIncluded: 0,
+    defaultExtra: 4,
+    required: false,
+  },
+};
+
+function marmitaCategoryKeys() {
+  return Object.keys(MARMITA_CATEGORIES);
+}
+
+function getMarmitaItems(key) {
+  if (key === 'carbo') return marmitaCarbos;
+  if (key === 'proteinas') return marmitaProteinas;
+  if (key === 'saladas') return marmitaSaladas;
+  if (key === 'adicionais') return marmitaAdicionais;
+  return [];
+}
+
+function setMarmitaItems(key, items) {
+  const normalizedItems = Array.isArray(items) ? items.map(String).filter(Boolean) : [];
+
+  if (key === 'carbo') marmitaCarbos = normalizedItems;
+  if (key === 'proteinas') marmitaProteinas = normalizedItems;
+  if (key === 'saladas') marmitaSaladas = normalizedItems;
+  if (key === 'adicionais') marmitaAdicionais = normalizedItems;
+}
+
+function numberInputValue(id, fallback) {
+  const value = Number(document.getElementById(id)?.value ?? fallback);
+  return Number.isFinite(value) && value >= 0 ? value : fallback;
+}
+
+function setMarmitaCategoryFields(key, data = {}) {
+  const meta = MARMITA_CATEGORIES[key];
+  if (!meta) return;
+
+  document.getElementById(meta.nameId).value = String(data.nome || meta.defaultName);
+  document.getElementById(meta.includedId).value = String(Number(data.inclusos ?? meta.defaultIncluded));
+  document.getElementById(meta.extraId).value = Number(data.valorExtra ?? meta.defaultExtra).toFixed(2);
+}
+
+function getMarmitaCategoryConfig(key) {
+  const meta = MARMITA_CATEGORIES[key];
+  const nome = String(document.getElementById(meta.nameId)?.value || meta.defaultName).trim() || meta.defaultName;
+  const inclusos = Math.max(0, Math.round(numberInputValue(meta.includedId, meta.defaultIncluded)));
+  const valorExtra = numberInputValue(meta.extraId, meta.defaultExtra);
+
+  return {
+    nome,
+    itens: getMarmitaItems(key).slice(),
+    inclusos,
+    valorExtra,
+    obrigatoria: meta.required,
+  };
+}
+
+function normalizeMarmitaCategoryConfig(config, key) {
+  const meta = MARMITA_CATEGORIES[key];
+  const current = config?.categorias?.[key] || {};
+  const legacyItems = Array.isArray(config?.[meta.legacyKey]) ? config[meta.legacyKey] : [];
+
+  return {
+    nome: current.nome || meta.defaultName,
+    itens: Array.isArray(current.itens) ? current.itens : legacyItems,
+    inclusos: Number(current.inclusos ?? current.quantidadeInclusa ?? meta.defaultIncluded),
+    valorExtra: Number(current.valorExtra ?? current.valorAdicional ?? meta.defaultExtra),
+    obrigatoria: current.obrigatoria ?? meta.required,
+  };
+}
+
+function applyMarmitaCategoriesConfig(config = null) {
+  marmitaCategoryKeys().forEach((key) => {
+    const normalized = normalizeMarmitaCategoryConfig(config || {}, key);
+    setMarmitaItems(key, normalized.itens);
+    setMarmitaCategoryFields(key, normalized);
+    renderMarmitaList(MARMITA_CATEGORIES[key].listId, getMarmitaItems(key));
+  });
+}
+
+function buildMarmitaCategoriesConfig() {
+  return marmitaCategoryKeys().reduce((acc, key) => {
+    acc[key] = getMarmitaCategoryConfig(key);
+    return acc;
+  }, {});
+}
+
 tabProdutos.onclick = () => {
   secProdutos.style.display = '';
   secMarmitas.style.display = 'none';
@@ -101,9 +228,7 @@ function renderMarmitaList(containerId, arr) {
 
   arr.forEach((v, i) => {
     const row = document.createElement('div');
-    row.style.display = 'flex';
-    row.style.justifyContent = 'space-between';
-    row.style.marginBottom = '6px';
+    row.className = 'marmita-item-row';
     row.innerHTML = `<span>${escapeHtml(v)}</span><div><button class="btn small" data-idx="${i}" data-list="${containerId}">Remover</button></div>`;
     el.appendChild(row);
   });
@@ -115,7 +240,6 @@ async function refreshProducts() {
     renderListaProdutos();
     window.dispatchEvent(new Event('produtosAtualizados'));
   } catch (err) {
-    console.error(err);
     alert(err.message || 'Erro ao carregar produtos');
     productsCache = [];
     renderListaProdutos();
@@ -127,12 +251,28 @@ if (form) {
     e.preventDefault();
 
     const id = document.getElementById('produtoId').value.trim();
-    const name = document.getElementById('nome').value.trim() || 'Sem nome';
+    const name = document.getElementById('nome').value.trim();
     const category = document.getElementById('categoria').value;
-    const price = Number(document.getElementById('preco').value || 0);
+    const priceRaw = document.getElementById('preco').value;
+    const price = Number(priceRaw);
     const desc = document.getElementById('descricao').value.trim();
     let image = document.getElementById('fotoUrl').value.trim();
     const file = document.getElementById('fotoFile').files[0];
+
+    if (!name) {
+      alert('Informe o nome do produto.');
+      return;
+    }
+
+    if (!category) {
+      alert('Selecione a categoria do produto.');
+      return;
+    }
+
+    if (priceRaw === '' || !Number.isFinite(price) || price <= 0) {
+      alert('Informe um preco valido maior que zero.');
+      return;
+    }
 
     if (category === 'marmitas') {
       alert('Cadastre marmitas na aba Marmitas!');
@@ -165,7 +305,6 @@ if (form) {
       await refreshProducts();
       alert('Produto salvo com sucesso.');
     } catch (err) {
-      console.error(err);
       alert(err.message || 'Erro ao salvar produto.');
     }
   });
@@ -193,6 +332,15 @@ if (formMarmita) {
     const precoP = Number(document.getElementById('marmitaPrecoP').value || 0);
     const precoM = Number(document.getElementById('marmitaPrecoM').value || 0);
     const precoG = Number(document.getElementById('marmitaPrecoG').value || 0);
+    const categorias = buildMarmitaCategoriesConfig();
+
+    const missingRequiredCategory = marmitaCategoryKeys().find((key) =>
+      categorias[key].obrigatoria && categorias[key].itens.length === 0
+    );
+    if (missingRequiredCategory) {
+      alert(`Adicione pelo menos 1 item em ${categorias[missingRequiredCategory].nome}.`);
+      return;
+    }
 
     const produto = {
       id: id ? Number(id) : undefined,
@@ -206,10 +354,11 @@ if (formMarmita) {
         precoP,
         precoM,
         precoG,
-        carbos: marmitaCarbos.slice(),
-        proteinas: marmitaProteinas.slice(),
-        saladas: marmitaSaladas.slice(),
-        adicionais: marmitaAdicionais.slice(),
+        categorias,
+        carbos: categorias.carbo.itens.slice(),
+        proteinas: categorias.proteinas.itens.slice(),
+        saladas: categorias.saladas.itens.slice(),
+        adicionais: categorias.adicionais.itens.slice(),
       },
     };
 
@@ -219,7 +368,6 @@ if (formMarmita) {
       await refreshProducts();
       alert('Marmita salva com sucesso.');
     } catch (err) {
-      console.error(err);
       alert(err.message || 'Erro ao salvar marmita.');
     }
   });
@@ -298,7 +446,6 @@ document.addEventListener('click', async (e) => {
       await refreshProducts();
       alert('Produto removido com sucesso.');
     } catch (err) {
-      console.error(err);
       alert(err.message || 'Erro ao remover produto.');
     }
   }
@@ -312,14 +459,7 @@ function resetForm() {
 function resetFormMarmita() {
   formMarmita.reset();
   document.getElementById('marmitaId').value = '';
-  marmitaCarbos = [];
-  marmitaProteinas = [];
-  marmitaSaladas = [];
-  marmitaAdicionais = [];
-  renderMarmitaList('marmitaListaCarbos', marmitaCarbos);
-  renderMarmitaList('marmitaListaProteinas', marmitaProteinas);
-  renderMarmitaList('marmitaListaSaladas', marmitaSaladas);
-  renderMarmitaList('marmitaListaAdicionais', marmitaAdicionais);
+  applyMarmitaCategoriesConfig();
 }
 
 function renderListaProdutos() {
@@ -364,14 +504,7 @@ function carregarParaEdicao(id) {
     document.getElementById('marmitaPrecoP').value = p.marmitaConfig?.precoP || '';
     document.getElementById('marmitaPrecoM').value = p.marmitaConfig?.precoM || '';
     document.getElementById('marmitaPrecoG').value = p.marmitaConfig?.precoG || '';
-    marmitaCarbos = Array.isArray(p.marmitaConfig?.carbos) ? p.marmitaConfig.carbos.slice() : [];
-    marmitaProteinas = Array.isArray(p.marmitaConfig?.proteinas) ? p.marmitaConfig.proteinas.slice() : [];
-    marmitaSaladas = Array.isArray(p.marmitaConfig?.saladas) ? p.marmitaConfig.saladas.slice() : [];
-    marmitaAdicionais = Array.isArray(p.marmitaConfig?.adicionais) ? p.marmitaConfig.adicionais.slice() : [];
-    renderMarmitaList('marmitaListaCarbos', marmitaCarbos);
-    renderMarmitaList('marmitaListaProteinas', marmitaProteinas);
-    renderMarmitaList('marmitaListaSaladas', marmitaSaladas);
-    renderMarmitaList('marmitaListaAdicionais', marmitaAdicionais);
+    applyMarmitaCategoriesConfig(p.marmitaConfig || {});
   } else {
     tabProdutos.click();
     document.getElementById('produtoId').value = p.id;

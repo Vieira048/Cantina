@@ -64,7 +64,7 @@
     }
 
     .checkout-item .meta {
-      font-size: 0.8rem;
+      font-size: 0.9rem;
       line-height: 1.35;
       color: #4a2b20;
     }
@@ -100,7 +100,7 @@
       color: #402b1f;
       font-weight: 700;
       text-decoration: underline;
-      font-size: 0.8rem;
+      font-size: 0.9rem;
       padding: 0;
     }
 
@@ -173,13 +173,19 @@
       }
     }
   </style>
+  <link rel="stylesheet" href="topbar.css" />
 </head>
 <body>
-  <header class="topbar">
-    <div class="logo">Cantina</div>
-    <nav>
-      <a class="btn" href="index.php">Voltar</a>
-      <a class="btn" href="deslogar.php">Deslogar</a>
+  <header class="topbar site-topbar">
+    <a class="site-topbar-brand" href="index.php" aria-label="Inicio">
+      <picture class="site-topbar-logo-wrap">
+        <source media="(max-width: 640px)" srcset="imagens/logo-mobile.png">
+        <img class="site-topbar-logo" src="imagens/logo-topbar.png" alt="Sabores Tecnicos - Cantina Online">
+      </picture>
+    </a>
+    <nav class="site-topbar-actions">
+      <a class="btn site-topbar-btn" href="index.php">Voltar</a>
+      <a class="btn site-topbar-btn" href="deslogar.php">Deslogar</a>
     </nav>
   </header>
 

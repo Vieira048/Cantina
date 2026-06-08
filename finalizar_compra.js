@@ -51,9 +51,22 @@ function itemDescription(item) {
     return '';
   }
 
+  const carbos = Array.isArray(item.carbos) && item.carbos.length > 0
+    ? item.carbos
+    : (item.carbo ? [item.carbo] : []);
+  const valorBase = Number(item.valorBase || 0);
+  const valorExtras = Number(item.valorExtras || 0);
+  const priceLines = valorBase > 0 || valorExtras > 0
+    ? `
+      <div><b>Valor base:</b> ${escapeHtml(brl(valorBase))}</div>
+      <div><b>Adicionais:</b> ${escapeHtml(brl(valorExtras))}</div>
+    `
+    : '';
+
   return `
     <div><b>Tamanho:</b> ${escapeHtml(item.tamanho || '-')}</div>
-    <div><b>Carbo:</b> ${escapeHtml(item.carbo || '-')}</div>
+    ${priceLines}
+    <div><b>Carbo:</b> ${carbos.map(escapeHtml).join(', ') || '-'}</div>
     <div><b>Proteinas:</b> ${(item.proteinas || []).map(escapeHtml).join(', ') || '-'}</div>
     <div><b>Saladas:</b> ${(item.saladas || []).map(escapeHtml).join(', ') || '-'}</div>
     <div><b>Adicionais:</b> ${(item.adicionais || []).map(escapeHtml).join(', ') || '-'}</div>
@@ -122,9 +135,14 @@ function buildApiItems() {
       ? {
           tamanho: item.tamanho || null,
           carbo: item.carbo || null,
+          carbos: Array.isArray(item.carbos) ? item.carbos : (item.carbo ? [item.carbo] : []),
           proteinas: Array.isArray(item.proteinas) ? item.proteinas : [],
           saladas: Array.isArray(item.saladas) ? item.saladas : [],
           adicionais: Array.isArray(item.adicionais) ? item.adicionais : [],
+          valor_base: Number(item.valorBase || 0),
+          valor_extras: Number(item.valorExtras || 0),
+          valor_total: Number(getItemUnitValue(item)),
+          extras_por_categoria: item.extrasPorCategoria || {},
         }
       : null,
   }));

@@ -49,6 +49,11 @@ final class ProductApiController
                     JsonResponse::send(422, ['ok' => false, 'message' => 'Nome e categoria sao obrigatorios.']);
                 }
 
+                $preco = isset($data['price']) ? (float) $data['price'] : 0.0;
+                if ($preco <= 0) {
+                    JsonResponse::send(422, ['ok' => false, 'message' => 'Informe um preco valido maior que zero.']);
+                }
+
                 $isUpdate = isset($data['id']) && (int) $data['id'] > 0;
                 $id = $this->products->save($data);
 

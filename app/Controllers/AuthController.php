@@ -99,10 +99,8 @@ final class AuthController extends Controller
                 $this->redirect($this->buildLoginRedirect('erro=schema_incompativel&ctx=register', $nextTarget));
             }
 
-            error_log('Erro SQL no cadastro: ' . $e->getMessage());
             $this->redirect($this->buildLoginRedirect('erro=sistema', $nextTarget));
         } catch (Throwable $e) {
-            error_log('Erro inesperado no cadastro: ' . $e->getMessage());
             $this->redirect($this->buildLoginRedirect('erro=sistema', $nextTarget));
         }
     }

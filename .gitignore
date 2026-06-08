@@ -1,0 +1,21 @@
+# Arquivos temporarios e logs locais
+*.log
+*.tmp
+*.bak
+*.old
+.tmp*
+
+# Saidas de tunnel/teste local
+cloudflared_tunnel*.log
+
+# Perfis/caches gerados por navegadores em testes
+edge-profile-temp-*/
+.edge-*/
+
+# Lixo comum de sistema operacional
+Thumbs.db
+.DS_Store
+
+# Prints gerados durante validacoes locais
+prints/*
+!prints/.gitkeep

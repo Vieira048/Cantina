@@ -107,8 +107,18 @@ function categoryBaseId(categoryName) {
 
   if (base.includes('salgad')) return 'salgados';
   if (base.includes('marmit')) return 'marmitas';
+  if (base.includes('combo')) return 'combos';
+  if (base.includes('produto')) return 'produtos';
+  if (base.includes('refriger')) return 'refrigerantes';
   if (base.includes('bebid')) return 'bebidas';
   return base || 'categoria';
+}
+
+function categorySortIndex(categoryName) {
+  const order = ['salgados', 'marmitas', 'combos', 'produtos', 'refrigerantes'];
+  const baseId = categoryBaseId(categoryName);
+  const index = order.indexOf(baseId);
+  return index >= 0 ? index : order.length;
 }
 
 function buildUniqueCategoryId(baseId, usedIds) {
@@ -123,26 +133,11 @@ function buildUniqueCategoryId(baseId, usedIds) {
 }
 
 function buildCategoryMenuEntries(categoryEntries) {
-  const preferredOrder = ['salgados', 'marmitas', 'bebidas'];
-  const ordered = [];
-  const used = new Set();
-
-  preferredOrder.forEach((key) => {
-    const found = categoryEntries.find((entry) => entry.baseId === key && !used.has(entry.id));
-    if (found) {
-      ordered.push(found);
-      used.add(found.id);
-    }
+  return [...categoryEntries].sort((a, b) => {
+    const priority = categorySortIndex(a.label) - categorySortIndex(b.label);
+    if (priority !== 0) return priority;
+    return normalizeText(a.label).localeCompare(normalizeText(b.label), 'pt-BR');
   });
-
-  categoryEntries.forEach((entry) => {
-    if (!used.has(entry.id)) {
-      ordered.push(entry);
-      used.add(entry.id);
-    }
-  });
-
-  return ordered;
 }
 
 function renderCategoryMenu(categoryEntries) {
@@ -203,6 +198,7 @@ function closeUsuarioMenu() {
 
 function toggleCategoriasMenu() {
   if (!menuCategoriasEl || !menuCategoriasToggleEl) return;
+  syncFixedTopbarOffset();
   const shouldOpen = !isCategoriasMenuOpen();
 
   if (shouldOpen) {
@@ -221,6 +217,7 @@ function toggleCategoriasMenu() {
 
 function toggleUsuarioMenu() {
   if (!menuUsuarioEl || !menuUsuarioToggleEl) return;
+  syncFixedTopbarOffset();
   const shouldOpen = !isUsuarioMenuOpen();
 
   if (shouldOpen) {
@@ -239,6 +236,14 @@ function toggleUsuarioMenu() {
 function closeAllFloatingMenus() {
   closeCategoriasMenu();
   closeUsuarioMenu();
+}
+
+function syncFixedTopbarOffset() {
+  const topbar = document.querySelector('.site-topbar-fixed');
+  if (!topbar) return;
+
+  const offset = Math.ceil(topbar.getBoundingClientRect().height + 12);
+  document.documentElement.style.setProperty('--fixed-topbar-bottom', `${offset}px`);
 }
 
 function setActiveCategoryMenuItem(targetId) {
@@ -313,13 +318,79 @@ function scrollToCategorySection(targetId) {
   });
 }
 
+function enableProductCardsDrag(cards) {
+  let isDragging = false;
+  let moved = false;
+  let blockNextClick = false;
+  let pointerId = null;
+  let startX = 0;
+  let startScrollLeft = 0;
+
+  cards.addEventListener('pointerdown', (event) => {
+    if (!window.matchMedia('(max-width: 480px)').matches) return;
+    if (event.pointerType === 'touch') return;
+    if (event.button !== undefined && event.button !== 0) return;
+
+    isDragging = true;
+    moved = false;
+    pointerId = event.pointerId;
+    startX = event.clientX;
+    startScrollLeft = cards.scrollLeft;
+    cards.classList.add('is-dragging');
+    cards.setPointerCapture(event.pointerId);
+  });
+
+  cards.addEventListener('pointermove', (event) => {
+    if (!isDragging || event.pointerId !== pointerId) return;
+
+    const deltaX = event.clientX - startX;
+    if (Math.abs(deltaX) > 4) {
+      moved = true;
+    }
+
+    if (moved) {
+      event.preventDefault();
+      cards.scrollLeft = startScrollLeft - deltaX;
+    }
+  });
+
+  const stopDrag = (event) => {
+    if (!isDragging || event.pointerId !== pointerId) return;
+
+    isDragging = false;
+    pointerId = null;
+    cards.classList.remove('is-dragging');
+
+    if (moved) {
+      blockNextClick = true;
+      window.setTimeout(() => {
+        blockNextClick = false;
+      }, 0);
+    }
+
+    if (cards.hasPointerCapture(event.pointerId)) {
+      cards.releasePointerCapture(event.pointerId);
+    }
+  };
+
+  cards.addEventListener('pointerup', stopDrag);
+  cards.addEventListener('pointercancel', stopDrag);
+  cards.addEventListener('pointerleave', stopDrag);
+  cards.addEventListener('click', (event) => {
+    if (!blockNextClick) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    blockNextClick = false;
+  }, true);
+}
+
 async function renderProdutos() {
   if (!produtosEl) return;
 
   try {
     produtos = await loadProducts();
   } catch (err) {
-    console.error(err);
     produtos = [];
   }
 
@@ -335,7 +406,11 @@ async function renderProdutos() {
   const usedSectionIds = new Set();
   const categoryEntries = [];
 
-  Object.keys(categorias).forEach((cat) => {
+  Object.keys(categorias).sort((a, b) => {
+    const priority = categorySortIndex(a) - categorySortIndex(b);
+    if (priority !== 0) return priority;
+    return normalizeText(a).localeCompare(normalizeText(b), 'pt-BR');
+  }).forEach((cat) => {
     const baseId = categoryBaseId(cat);
     const sectionId = buildUniqueCategoryId(baseId, usedSectionIds);
     categoryEntries.push({ label: cat, id: sectionId, baseId });
@@ -372,6 +447,7 @@ async function renderProdutos() {
       cards.appendChild(card);
     });
 
+    enableProductCardsDrag(cards);
     produtosEl.appendChild(section);
   });
 
@@ -406,10 +482,18 @@ function renderCarrinho() {
   carrinho.forEach((item, idx) => {
     const quantidade = Math.max(1, Number(item.quantidade || 1));
     const valor = item.isMarmita ? Number(item.valor ?? item.price ?? 0) : Number(item.price ?? 0);
+    const carbos = Array.isArray(item.carbos) && item.carbos.length > 0
+      ? item.carbos
+      : (item.carbo ? [item.carbo] : []);
+    const extrasInfo = item.isMarmita && (Number(item.valorBase || 0) > 0 || Number(item.valorExtras || 0) > 0)
+      ? `<b>Base:</b> ${formatMoney(item.valorBase || 0)}<br>
+          <b>Adicionais:</b> ${formatMoney(item.valorExtras || 0)}<br>`
+      : '';
     const desc = item.isMarmita
       ? `<div style="font-size:12px;color:#666">
           <b>Tam:</b> ${escapeHtml(item.tamanho || '-') }<br>
-          <b>Carbo:</b> ${escapeHtml(item.carbo || '-') }<br>
+          ${extrasInfo}
+          <b>Carbo:</b> ${carbos.map(escapeHtml).join(', ') || '-'}<br>
           <b>Proteinas:</b> ${(item.proteinas || []).map(escapeHtml).join(', ') || '-'}<br>
           <b>Saladas:</b> ${(item.saladas || []).map(escapeHtml).join(', ') || '-'}<br>
           <b>Adicionais:</b> ${(item.adicionais || []).map(escapeHtml).join(', ') || '-'}
@@ -490,12 +574,18 @@ if (finalizarBtn) {
   };
 }
 
+function setCartOpen(open) {
+  if (!carrinhoEl) return;
+  carrinhoEl.classList.toggle('open', open);
+  document.body.classList.toggle('cart-is-open', open);
+}
+
 if (abrirCarrinhoBtn) {
-  abrirCarrinhoBtn.onclick = () => carrinhoEl && carrinhoEl.classList.add('open');
+  abrirCarrinhoBtn.onclick = () => setCartOpen(true);
 }
 
 if (fecharCarrinhoBtn) {
-  fecharCarrinhoBtn.onclick = () => carrinhoEl && carrinhoEl.classList.remove('open');
+  fecharCarrinhoBtn.onclick = () => setCartOpen(false);
 }
 
 if (menuCategoriasToggleEl) {
@@ -532,8 +622,14 @@ if (menuCategoriasListaEl) {
 }
 
 window.addEventListener('scroll', requestCategoryMenuActiveSync, { passive: true });
-window.addEventListener('resize', requestCategoryMenuActiveSync);
-window.addEventListener('load', requestCategoryMenuActiveSync);
+window.addEventListener('resize', () => {
+  syncFixedTopbarOffset();
+  requestCategoryMenuActiveSync();
+});
+window.addEventListener('load', () => {
+  syncFixedTopbarOffset();
+  requestCategoryMenuActiveSync();
+});
 
 document.addEventListener('click', (event) => {
   const target = event.target;
@@ -575,6 +671,7 @@ function addToCart(produto) {
       item.isMarmita &&
       item.id === produto.id &&
       item.tamanho === produto.tamanho &&
+      JSON.stringify(item.carbos || (item.carbo ? [item.carbo] : [])) === JSON.stringify(produto.carbos || (produto.carbo ? [produto.carbo] : [])) &&
       item.carbo === produto.carbo &&
       JSON.stringify(item.proteinas || []) === JSON.stringify(produto.proteinas || []) &&
       JSON.stringify(item.saladas || []) === JSON.stringify(produto.saladas || []) &&

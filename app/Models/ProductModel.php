@@ -5,6 +5,7 @@ namespace App\Models;
 
 use App\Core\Database;
 use mysqli;
+use RuntimeException;
 
 final class ProductModel
 {
@@ -50,6 +51,14 @@ final class ProductModel
         $imagem = trim((string) ($payload['image'] ?? ''));
         $isMarmita = !empty($payload['isMarmita']) ? 1 : 0;
         $marmitaConfig = null;
+
+        if ($nome === '' || $categoria === '') {
+            throw new RuntimeException('Nome e categoria sao obrigatorios.');
+        }
+
+        if ($preco <= 0) {
+            throw new RuntimeException('Informe um preco valido maior que zero.');
+        }
 
         if (isset($payload['marmitaConfig']) && is_array($payload['marmitaConfig'])) {
             $marmitaConfig = json_encode($payload['marmitaConfig'], JSON_UNESCAPED_UNICODE);

@@ -8,6 +8,18 @@
   <link rel="stylesheet" href="style.css" />
   <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
   <style>
+    .site-mobile-auth-topbar {
+      display: none;
+    }
+
+    .site-mobile-auth-logo {
+      display: block;
+      width: 88px;
+      height: 64px;
+      max-width: 92px;
+      object-fit: contain;
+    }
+
     .auth-page {
       display: flex;
       min-height: 100vh;
@@ -84,16 +96,36 @@
       color: #402B1F;
       font-size: 0.92rem;
     }
+
+    @media (max-width: 640px) {
+      .site-mobile-auth-topbar {
+        position: sticky;
+        top: 0;
+        z-index: 150;
+        height: 82px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0 16px;
+        background: #402B1F;
+        border-bottom: 1px solid rgba(217, 204, 197, 0.16);
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.24);
+      }
+
+      .auth-page {
+        min-height: calc(100vh - 82px);
+        padding-top: 24px;
+      }
+    }
   </style>
 </head>
 
 <body data-open-register="<?php echo !empty($showRegister) ? '1' : '0'; ?>">
   <?php $nextValue = isset($nextTarget) ? trim((string) $nextTarget) : ''; ?>
   <?php $registerAction = 'register.php' . ($nextValue !== '' ? ('?next=' . rawurlencode($nextValue)) : ''); ?>
-  <header class="topbar">
-    <div class="logo">Cantina</div>
+  <header class="site-mobile-auth-topbar" aria-label="Sabores Tecnicos">
+    <img class="site-mobile-auth-logo" src="imagens/logo-mobile.png" alt="Sabores Tecnicos">
   </header>
-
   <main class="auth-page">
     <div class="auth-card">
       <?php if (($mensagem ?? null) !== null): ?>

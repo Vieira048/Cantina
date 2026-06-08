@@ -5,7 +5,8 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Cantina - Home</title>
-  <link rel="stylesheet" href="style.css?v=menu_categorias_linha_20260606_5" />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="topbar.css" />
   <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
 </head>
 
@@ -22,8 +23,8 @@
     $fotoExibicao = trim((string) ($fotoUsuario ?? ''));
     $temFoto = $fotoExibicao !== '';
   ?>
-  <header class="topbar">
-    <div class="topbar-left">
+  <header class="topbar site-topbar site-topbar-fixed">
+    <div class="topbar-left site-topbar-left">
       <button
         id="menuCategoriasToggle"
         class="menu-toggle"
@@ -38,9 +39,14 @@
       </button>
     </div>
 
-    <div class="logo">Cantina</div>
+    <a class="site-topbar-brand" href="index.php" aria-label="Inicio">
+      <picture class="site-topbar-logo-wrap">
+        <source media="(max-width: 640px)" srcset="imagens/logo-mobile.png">
+        <img class="site-topbar-logo" src="imagens/logo-topbar.png" alt="Sabores Tecnicos - Cantina Online">
+      </picture>
+    </a>
 
-    <nav class="topbar-right">
+    <nav class="topbar-right site-topbar-actions">
       <button
         id="menuUsuarioToggle"
         class="btn btn-user"
@@ -61,7 +67,7 @@
           <?php endif; ?>
         </span>
       </button>
-      <button id="abrirCarrinho" class="btn">Carrinho (<span id="contador">0</span>)</button>
+      <button id="abrirCarrinho" class="btn site-topbar-btn">Carrinho (<span id="contador">0</span>)</button>
     </nav>
   </header>
 
@@ -144,7 +150,7 @@
     </div>
   </aside>
 
-  <script src="script.js?v=menu_categorias_linha_20260606_5"></script>
+  <script src="script.js"></script>
 </body>
 
 <footer class="footer">
